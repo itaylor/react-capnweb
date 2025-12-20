@@ -1,8 +1,10 @@
+// deno-lint-ignore verbatim-module-syntax
 import * as React from 'react';
-import { createContext, use, useContext, useEffect, useState } from 'react';
+import { createContext, useState } from 'react';
 import type { RpcCompatible, RpcSessionOptions } from 'capnweb';
 import { newWebSocketRpcSession } from 'capnweb';
-import type { CapnWebHooks, RpcApi } from './core.tsx';
+import { createHooksForContext } from './core.tsx';
+import type { CapnWebHooks } from './core.tsx';
 
 /**
  * Options for configuring WebSocket RPC connection behavior.
@@ -133,33 +135,10 @@ export function initCapnWebSocket<T extends RpcCompatible<T>>(
     </apiContext.Provider>;
   }
 
-  function useCapnWeb<TResult>(
-    fn: (api: RpcApi<T>) => Promise<TResult>,
-    deps: any[] = [],
-  ): TResult | undefined {
-    const api = useCapnWebApi();
-    const [prom, setProm] = useState<Promise<TResult> | null>(null);
-    useEffect(() => {
-      setProm(fn(api));
-    }, [api, ...deps]);
-    if (prom) {
-      return use(prom);
-    }
-    return undefined;
-  }
-
-  function useCapnWebApi(): RpcApi<T> {
-    const api = useContext(apiContext);
-    if (!api) {
-      throw new Error('useCapnWebApi must be used within a CapnWebProvider');
-    }
-
-    return api as RpcApi<T>;
-  }
+  const hooks = createHooksForContext<T>(apiContext);
 
   return {
-    useCapnWeb,
-    useCapnWebApi,
+    ...hooks,
     CapnWebProvider,
   };
 }

@@ -1,3 +1,4 @@
+// deno-lint-ignore verbatim-module-syntax
 import * as React from 'react';
 import { createContext, use, useContext, useEffect, useState } from 'react';
 import type { RpcCompatible } from 'capnweb';
@@ -42,24 +43,15 @@ export interface CapnWebHooks<T> {
 }
 
 /**
- * Creates the standard set of React hooks for a capnweb transport.
- * This is used internally by all transport-specific initialization functions.
+ * Creates hook functions that work with a provided context.
+ * This is used when you need custom provider logic (like reconnection in WebSocket).
  *
- * @param sessionFactory - Function that creates and returns the RPC session/stub
- * @returns The standard CapnWebHooks interface
+ * @param apiContext - React context that holds the RPC session/stub
+ * @returns Hook functions (useCapnWeb and useCapnWebApi)
  */
-export function createCapnWebHooks<T extends RpcCompatible<T>>(
-  sessionFactory: () => any,
-): CapnWebHooks<T> {
-  const apiContext = createContext<any | null>(null);
-
-  function CapnWebProvider({ children }: { children: React.ReactNode }) {
-    const [session] = useState<any>(sessionFactory);
-
-    return <apiContext.Provider value={session}>{children}
-    </apiContext.Provider>;
-  }
-
+export function createHooksForContext<T extends RpcCompatible<T>>(
+  apiContext: React.Context<any>,
+): Omit<CapnWebHooks<T>, 'CapnWebProvider'> {
   function useCapnWeb<TResult>(
     fn: (api: RpcApi<T>) => Promise<TResult>,
     deps: any[] = [],
@@ -87,6 +79,33 @@ export function createCapnWebHooks<T extends RpcCompatible<T>>(
   return {
     useCapnWeb,
     useCapnWebApi,
+  };
+}
+
+/**
+ * Creates the standard set of React hooks for a capnweb transport.
+ * This is used internally by transport-specific initialization functions
+ * that don't need custom provider logic.
+ *
+ * @param sessionFactory - Function that creates and returns the RPC session/stub
+ * @returns The standard CapnWebHooks interface
+ */
+export function createCapnWebHooks<T extends RpcCompatible<T>>(
+  sessionFactory: () => any,
+): CapnWebHooks<T> {
+  const apiContext = createContext<any | null>(null);
+
+  function CapnWebProvider({ children }: { children: React.ReactNode }) {
+    const [session] = useState<any>(sessionFactory);
+
+    return <apiContext.Provider value={session}>{children}
+    </apiContext.Provider>;
+  }
+
+  const hooks = createHooksForContext<T>(apiContext);
+
+  return {
+    ...hooks,
     CapnWebProvider,
   };
 }
