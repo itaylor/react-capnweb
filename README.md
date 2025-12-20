@@ -1,6 +1,6 @@
 # react-capnweb
 
-React hooks and components for [capnweb](https://jsr.io/@itaylor/capnweb) -
+React hooks and components for [capnweb](https://github.com/cloudflare/capnweb) -
 WebSocket RPC with Cap'n Proto.
 
 ## Overview
@@ -184,9 +184,3 @@ Hook that returns direct access to the RPC API.
 ## License
 
 MIT License - see [LICENSE](./LICENSE) for details.
-
-## Related Projects
-
-- [capnweb](https://jsr.io/@itaylor/capnweb) - WebSocket RPC with Cap'n Proto
-- [type-router-react](https://jsr.io/@itaylor/type-router-react) - Type-safe
-  routing for React
