@@ -45,13 +45,13 @@ await build({
       node: '>=14.0.0',
     },
     peerDependencies: {
-      react: '>=18.0.0',
-      'react-dom': '>=18.0.0',
-      capnweb: '>=1.0.0',
+      react: '>=19.0.0',
+      'react-dom': '>=19.0.0',
+      capnweb: '>=0.3.0',
     },
     devDependencies: {
-      '@types/react': '^18.0.0',
-      '@types/react-dom': '^18.0.0',
+      '@types/react': '^19.0.0',
+      '@types/react-dom': '^19.0.0',
     },
     homepage: 'https://github.com/itaylor/react-capnweb',
     repository: {
@@ -79,9 +79,6 @@ await build({
   compilerOptions: {
     target: 'ES2020',
     lib: ['ES2020', 'DOM', 'DOM.Iterable'],
-    // put these back once https://github.com/denoland/dnt/issues/384 is closed
-    //    jsx: 'react-jsx',
-    //    jsxImportSource: 'react',
   },
   typeCheck: 'both',
   declaration: 'separate',
