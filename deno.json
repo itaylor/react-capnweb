@@ -2,9 +2,25 @@
   "name": "@itaylor/react-capnweb",
   "version": "1.0.0",
   "description": "React hooks and components for capnweb - WebSocket RPC with Cap'n Proto",
-  "exports": "./react-capnweb.tsx",
+  "exports": {
+    ".": "./mod.tsx",
+    "./websocket": "./websocket.tsx",
+    "./http-batch": "./http-batch.tsx",
+    "./message-port": "./message-port.tsx",
+    "./custom-transport": "./custom-transport.tsx",
+    "./core": "./core.tsx"
+  },
   "publish": {
-    "include": ["react-capnweb.tsx", "README.md", "LICENSE"]
+    "include": [
+      "core.tsx",
+      "websocket.tsx",
+      "http-batch.tsx",
+      "message-port.tsx",
+      "custom-transport.tsx",
+      "mod.tsx",
+      "README.md",
+      "LICENSE"
+    ]
   },
   "imports": {
     "capnweb": "npm:capnweb@0.3.0",

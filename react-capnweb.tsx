@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type * as React from 'react';
 import { createContext, use, useContext, useEffect, useState } from 'react';
 import type { RpcCompatible } from 'capnweb';
 import { newWebSocketRpcSession } from 'capnweb';

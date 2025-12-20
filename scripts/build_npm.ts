@@ -8,7 +8,32 @@ import denoJson from '../deno.json' with { type: 'json' };
 await emptyDir('./npm');
 
 await build({
-  entryPoints: ['./react-capnweb.tsx'],
+  entryPoints: [
+    {
+      name: '.',
+      path: './mod.tsx',
+    },
+    {
+      name: './websocket',
+      path: './websocket.tsx',
+    },
+    {
+      name: './http-batch',
+      path: './http-batch.tsx',
+    },
+    {
+      name: './message-port',
+      path: './message-port.tsx',
+    },
+    {
+      name: './custom-transport',
+      path: './custom-transport.tsx',
+    },
+    {
+      name: './core',
+      path: './core.tsx',
+    },
+  ],
   outDir: './npm',
   shims: {
     deno: false,
@@ -31,6 +56,10 @@ await build({
       'capnproto',
       'capnweb',
       'websocket',
+      'http',
+      'messageport',
+      'worker',
+      'iframe',
       'rpc',
       'typescript',
       'type-safe',
@@ -38,6 +67,7 @@ await build({
       'components',
       'frontend',
       'browser',
+      'transport',
     ],
     license: 'MIT',
     author: 'itaylor',

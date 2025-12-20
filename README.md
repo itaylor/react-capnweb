@@ -1,7 +1,8 @@
 # react-capnweb
 
-React hooks and components for [capnweb](https://github.com/cloudflare/capnweb) -
-WebSocket RPC with Cap'n Proto.
+React hooks and components for
+[capnweb](https://github.com/cloudflare/capnweb) - WebSocket RPC with Cap'n
+Proto.
 
 ## Overview
 
