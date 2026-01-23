@@ -1,6 +1,6 @@
 import type { RpcCompatible, RpcSessionOptions, RpcTransport } from 'capnweb';
 import { RpcSession } from 'capnweb';
-import { createCapnWebHooks } from './core.tsx';
+import { createCapnWebHooksWithLifecycle } from './core.tsx';
 import type { CapnWebHooks } from './core.tsx';
 
 /**
@@ -47,6 +47,9 @@ export interface CustomTransportOptions {
  * Note: RPC sessions are symmetric - neither side is "client" or "server".
  * Each side can optionally expose a main interface via localMain.
  *
+ * The transport connection persists across provider mount/unmount cycles.
+ * Use the returned `close()` function to manually close the connection when needed.
+ *
  * @example
  * ```tsx
  * import { initCapnCustomTransport } from '@itaylor/react-capnweb/custom-transport';
@@ -65,7 +68,7 @@ export interface CustomTransportOptions {
  *   }
  * }
  *
- * const { CapnWebProvider, useCapnWeb, useCapnWebApi } =
+ * const { CapnWebProvider, useCapnWeb, useCapnWebApi, close } =
  *   initCapnCustomTransport<MyApi>(new MyCustomTransport(), {
  *     localMain: new MyLocalApi(),
  *   });
@@ -77,26 +80,32 @@ export interface CustomTransportOptions {
  *     </CapnWebProvider>
  *   );
  * }
+ *
+ * // Later, to close the connection:
+ * close();
  * ```
  *
  * @example
  * ```tsx
  * // Using a factory function for lazy initialization
- * const { CapnWebProvider } = initCapnCustomTransport<MyApi>(
- *   () => new MyCustomTransport(), // Created when provider mounts
+ * const { CapnWebProvider, close } = initCapnCustomTransport<MyApi>(
+ *   () => new MyCustomTransport(), // Created when first needed
  *   { localMain: new MyLocalApi() }
  * );
  * ```
  *
  * @param transport - RpcTransport instance or factory function that creates one
  * @param options - Configuration options for the RPC session
- * @returns React hooks for interacting with the RPC API
+ * @returns React hooks for interacting with the RPC API, plus a close() function
  */
 export function initCapnCustomTransport<T extends RpcCompatible<T>>(
   transport: RpcTransport | (() => RpcTransport),
   options: CustomTransportOptions = {},
 ): CapnWebHooks<T> {
-  // Create the session factory
+  // Keep references for cleanup
+  let currentTransport: RpcTransport | null = null;
+  let rpcSession: any = null;
+
   const sessionFactory = () => {
     try {
       // Get the transport (call factory if needed)
@@ -104,15 +113,18 @@ export function initCapnCustomTransport<T extends RpcCompatible<T>>(
         ? transport()
         : transport;
 
+      currentTransport = actualTransport;
+
       // Create the RpcSession manually with the custom transport
-      const session: any = new RpcSession<T>(
+      rpcSession = new RpcSession(
         actualTransport,
         options.localMain,
         options.sessionOptions,
-      );
+      ) as any;
 
-      // Return the remote main stub
-      return session.getRemoteMain();
+      // Get the remote main stub
+      const stub = rpcSession.getRemoteMain();
+      return stub;
     } catch (error) {
       if (options.onError) {
         options.onError(error as Error);
@@ -121,6 +133,31 @@ export function initCapnCustomTransport<T extends RpcCompatible<T>>(
     }
   };
 
-  // Use the shared core hooks implementation
-  return createCapnWebHooks<T>(sessionFactory);
+  const onClose = () => {
+    // Abort the transport if it supports it
+    if (currentTransport && typeof currentTransport.abort === 'function') {
+      try {
+        currentTransport.abort('Connection closed by client');
+      } catch (error) {
+        console.error('Error aborting custom transport:', error);
+      }
+    }
+
+    // Dispose the RPC session
+    if (rpcSession) {
+      try {
+        const disposable = rpcSession as any;
+        if (typeof disposable[Symbol.dispose] === 'function') {
+          disposable[Symbol.dispose]();
+        }
+      } catch (error) {
+        console.error('Error disposing RPC session:', error);
+      }
+    }
+
+    currentTransport = null;
+    rpcSession = null;
+  };
+
+  return createCapnWebHooksWithLifecycle<T>(sessionFactory, onClose);
 }

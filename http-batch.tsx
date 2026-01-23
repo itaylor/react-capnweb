@@ -1,6 +1,6 @@
 import type { RpcCompatible, RpcSessionOptions } from 'capnweb';
 import { newHttpBatchRpcSession } from 'capnweb';
-import { createCapnWebHooks } from './core.tsx';
+import { createCapnWebHooksWithLifecycle } from './core.tsx';
 import type { CapnWebHooks } from './core.tsx';
 
 /**
@@ -67,11 +67,14 @@ export interface HttpBatchOptions {
  * - No server-initiated calls (request/response only)
  * - No automatic reconnection needed (each call is independent)
  *
+ * The HTTP Batch session persists across provider mount/unmount cycles for efficient batching.
+ * Use the returned `close()` function to dispose the session when completely done.
+ *
  * @example
  * ```tsx
  * import { initCapnHttpBatch } from '@itaylor/react-capnweb/http-batch';
  *
- * const { CapnWebProvider, useCapnWeb, useCapnWebApi } =
+ * const { CapnWebProvider, useCapnWeb, useCapnWebApi, close } =
  *   initCapnHttpBatch<MyApi>('/api/rpc', {
  *     headers: { 'Authorization': 'Bearer token123' },
  *     credentials: 'include',
@@ -84,11 +87,14 @@ export interface HttpBatchOptions {
  *     </CapnWebProvider>
  *   );
  * }
+ *
+ * // Later, to dispose the session:
+ * close();
  * ```
  *
  * @param url - URL endpoint for the RPC API (e.g., '/api/rpc' or 'https://api.example.com/rpc')
  * @param options - Configuration options for HTTP requests
- * @returns React hooks for interacting with the RPC API
+ * @returns React hooks for interacting with the RPC API, plus a close() function
  */
 export function initCapnHttpBatch<T extends RpcCompatible<T>>(
   url: string,
@@ -105,7 +111,6 @@ export function initCapnHttpBatch<T extends RpcCompatible<T>>(
     referrerPolicy: options.referrerPolicy,
   });
 
-  // Create the session factory
   const sessionFactory = () => {
     try {
       const session: any = newHttpBatchRpcSession<T>(
@@ -121,6 +126,7 @@ export function initCapnHttpBatch<T extends RpcCompatible<T>>(
     }
   };
 
-  // Use the shared core hooks implementation
-  return createCapnWebHooks<T>(sessionFactory);
+  // No cleanup needed for HTTP Batch (no persistent connection)
+  // Session disposal is handled by the shared lifecycle manager
+  return createCapnWebHooksWithLifecycle<T>(sessionFactory);
 }

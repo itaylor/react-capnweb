@@ -1,6 +1,6 @@
 import type { RpcCompatible, RpcSessionOptions } from 'capnweb';
 import { newMessagePortRpcSession } from 'capnweb';
-import { createCapnWebHooks } from './core.tsx';
+import { createCapnWebHooksWithLifecycle } from './core.tsx';
 import type { CapnWebHooks } from './core.tsx';
 
 /**
@@ -20,7 +20,7 @@ export interface MessagePortOptions {
 
   /**
    * Callback invoked when the MessagePort is disconnected.
-   * Note: MessagePorts are typically one-time use and cannot be reconnected.
+   * Note: The 'close' event has limited browser support. Test in your target environments.
    */
   onDisconnect?: () => void;
 }
@@ -41,6 +41,9 @@ export interface MessagePortOptions {
  * - No automatic reconnection (MessagePorts are one-time use)
  * - Native browser API with excellent support
  *
+ * The MessagePort connection persists across provider mount/unmount cycles.
+ * Use the returned `close()` function to manually close the connection when needed.
+ *
  * Security Note: Always create a new MessageChannel and send one port to the
  * other context. Never use Window objects directly as ports, as anyone can
  * postMessage to a window. Verify that you received the port from the expected
@@ -53,7 +56,7 @@ export interface MessagePortOptions {
  *
  * const channel = new MessageChannel();
  *
- * const { CapnWebProvider, useCapnWebApi } =
+ * const { CapnWebProvider, useCapnWebApi, close } =
  *   initCapnMessagePort<WorkerApi>(channel.port1, {
  *     localMain: new ParentApi(), // Worker can call this
  *   });
@@ -68,6 +71,9 @@ export interface MessagePortOptions {
  *     </CapnWebProvider>
  *   );
  * }
+ *
+ * // Later, to close the connection:
+ * close();
  * ```
  *
  * @example
@@ -88,18 +94,18 @@ export interface MessagePortOptions {
  *
  * @param port - MessagePort to communicate over
  * @param options - Configuration options for the MessagePort connection
- * @returns React hooks for interacting with the RPC API
+ * @returns React hooks for interacting with the RPC API, plus a close() function
  */
 export function initCapnMessagePort<T extends RpcCompatible<T>>(
   port: MessagePort,
   options: MessagePortOptions = {},
 ): CapnWebHooks<T> {
   // Set up disconnect handler if provided
+  // Note: 'close' event has limited browser support - see documentation
   if (options.onDisconnect) {
     port.addEventListener('close', options.onDisconnect);
   }
 
-  // Create the session factory
   const sessionFactory = () => {
     const session: any = newMessagePortRpcSession<T>(
       port,
@@ -109,6 +115,14 @@ export function initCapnMessagePort<T extends RpcCompatible<T>>(
     return session;
   };
 
-  // Use the shared core hooks implementation
-  return createCapnWebHooks<T>(sessionFactory);
+  const onClose = () => {
+    // Close the MessagePort
+    try {
+      port.close();
+    } catch (error) {
+      console.error('Error closing MessagePort:', error);
+    }
+  };
+
+  return createCapnWebHooksWithLifecycle<T>(sessionFactory, onClose);
 }

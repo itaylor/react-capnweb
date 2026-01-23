@@ -13,3 +13,7 @@ test-fixtures/dist/
 # Test coverage
 coverage/
 .zed/
+
+# Test artifacts
+error.png
+*.log

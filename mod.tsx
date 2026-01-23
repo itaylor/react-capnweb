@@ -15,7 +15,12 @@
 export type { CapnWebHooks, RpcApi } from './core.tsx';
 
 // Re-export WebSocket transport
-export { initCapnWebSocket, type WebSocketOptions } from './websocket.tsx';
+export {
+  initCapnWebSocket,
+  type WebSocketCapnWebHooks,
+  type WebSocketConnectionState,
+  type WebSocketOptions,
+} from './websocket.tsx';
 
 // Re-export HTTP Batch transport
 export { type HttpBatchOptions, initCapnHttpBatch } from './http-batch.tsx';

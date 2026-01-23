@@ -49,14 +49,39 @@ Persistent bidirectional connection for real-time communication.
 ```typescript
 import { initCapnWebSocket } from '@itaylor/react-capnweb/websocket';
 
-const { CapnWebProvider, useCapnWeb, useCapnWebApi } = initCapnWebSocket<MyApi>(
+const { CapnWebProvider, useCapnWeb, useCapnWebApi, close, useConnectionState } = initCapnWebSocket<MyApi>(
   'ws://localhost:8080/api',
   {
     timeout: 5000, // Connection timeout in ms
     retries: 10, // Max reconnection attempts
+    backoffStrategy: (retryCount) => retryCount * 1000, // Optional: custom backoff
     localMain: new MyClientApi(), // Optional: expose API to server
+    onConnected: () => console.log('Connected!'),
+    onDisconnected: (reason) => console.log('Disconnected:', reason),
+    onReconnecting: (attempt) => console.log('Reconnecting, attempt', attempt),
+    onReconnectFailed: () => console.log('All retries exhausted'),
   },
 );
+
+// The WebSocket connection persists across provider mount/unmount.
+// To manually close the connection when needed:
+// close();
+
+// Track connection state in your components:
+function ConnectionStatus() {
+  const state = useConnectionState();
+  
+  if (state.status === 'connecting') {
+    return <div>Connecting...</div>;
+  }
+  if (state.status === 'reconnecting') {
+    return <div>Reconnecting (attempt {state.attempt})...</div>;
+  }
+  if (state.status === 'connected') {
+    return <div>Connected</div>;
+  }
+  return <div>Disconnected</div>;
+}
 ```
 
 ### HTTP Batch
@@ -73,13 +98,17 @@ Stateless HTTP requests for serverless and edge deployments.
 ```typescript
 import { initCapnHttpBatch } from '@itaylor/react-capnweb/http-batch';
 
-const { CapnWebProvider, useCapnWeb, useCapnWebApi } = initCapnHttpBatch<MyApi>(
+const { CapnWebProvider, useCapnWeb, useCapnWebApi, close } = initCapnHttpBatch<MyApi>(
   '/api/rpc',
   {
     headers: { 'Authorization': 'Bearer token123' },
     credentials: 'include',
   },
 );
+
+// Note: HTTP Batch has no persistent connection. close() disposes the session
+// and prevents further use.
+// close();
 ```
 
 ### MessagePort
@@ -98,12 +127,16 @@ import { initCapnMessagePort } from '@itaylor/react-capnweb/message-port';
 
 const channel = new MessageChannel();
 
-const { CapnWebProvider, useCapnWebApi } = initCapnMessagePort<WorkerApi>(
+const { CapnWebProvider, useCapnWebApi, close } = initCapnMessagePort<WorkerApi>(
   channel.port1,
   {
     localMain: new ParentApi(), // Optional: expose API to worker
   },
 );
+
+// The MessagePort connection persists across provider mount/unmount.
+// To manually close the connection when needed:
+// close();
 
 // Send port2 to worker
 worker.postMessage({ port: channel.port2 }, [channel.port2]);
@@ -130,11 +163,15 @@ class MyTransport implements RpcTransport {
   abort?(reason: any): void {/* ... */}
 }
 
-const { CapnWebProvider, useCapnWeb, useCapnWebApi } = initCapnCustomTransport<
+const { CapnWebProvider, useCapnWeb, useCapnWebApi, close } = initCapnCustomTransport<
   MyApi
 >(new MyTransport(), {
   localMain: new MyLocalApi(),
 });
+
+// The transport connection persists across provider mount/unmount.
+// To manually close the connection when needed:
+// close();
 ```
 
 ## Usage
@@ -259,8 +296,16 @@ interface CapnWebHooks<T> {
     deps?: any[],
   ) => TResult | undefined;
   useCapnWebApi: () => RpcApi<T>;
+  close: () => void; // Manually close the connection and dispose the session
 }
 ```
+
+**Note:** All transports now include a `close()` function for manual resource cleanup.
+The specific behavior depends on the transport:
+- **WebSocket**: Closes the connection and prevents reconnection
+- **HTTP Batch**: Disposes the session (no persistent connection to close)
+- **MessagePort**: Closes the port and disposes the session
+- **Custom Transport**: Calls `abort()` on the transport if available and disposes the session
 
 ### `CapnWebProvider`
 
@@ -305,9 +350,103 @@ const result = await api.someMethod();
 interface WebSocketOptions {
   timeout?: number; // Connection timeout in ms (default: 5000)
   retries?: number; // Max reconnection attempts (default: 10)
+  backoffStrategy?: (retryCount: number) => number; // Delay calculation function
   localMain?: any; // Local API for bidirectional RPC
   sessionOptions?: RpcSessionOptions; // Additional capnweb options
+  onConnected?: () => void; // Callback when connection established
+  onDisconnected?: (reason?: string) => void; // Callback when connection lost
+  onReconnecting?: (attempt: number) => void; // Callback when reconnection starts
+  onReconnectFailed?: () => void; // Callback when all retries exhausted
 }
+
+// Returns:
+interface WebSocketCapnWebHooks<T> extends CapnWebHooks<T> {
+  useConnectionState: () => WebSocketConnectionState;
+}
+
+type WebSocketConnectionState =
+  | { status: 'connecting'; attempt: number }
+  | { status: 'connected' }
+  | { status: 'reconnecting'; attempt: number; nextRetryMs?: number }
+  | { status: 'disconnected'; reason?: string }
+  | { status: 'closed' };
+
+// Connection Lifecycle:
+// - WebSocket connection persists across provider mount/unmount
+// - Only closes when disconnected, retries exhausted, or close() is called
+```
+
+**Backoff Strategy:**
+
+The `backoffStrategy` function controls the delay before each reconnection attempt. It receives the current retry count (1-indexed) and returns the delay in milliseconds.
+
+Default: Exponential backoff with jitter
+- Base delay: 1s, doubles each retry (1s, 2s, 4s, 8s, 16s, max 30s)
+- Adds random jitter of 0-1000ms to prevent thundering herd
+
+```typescript
+// Custom fixed delay of 5 seconds
+backoffStrategy: () => 5000
+
+// Linear backoff: 2s, 4s, 6s, 8s...
+backoffStrategy: (retryCount) => retryCount * 2000
+
+// Custom exponential without jitter, max 60s
+backoffStrategy: (retryCount) => Math.min(1000 * Math.pow(2, retryCount - 1), 60000)
+```
+
+**Connection State Hook:**
+
+The `useConnectionState()` hook returns the current connection state, allowing you to display connection status in your UI.
+
+```typescript
+function ConnectionIndicator() {
+  const state = useConnectionState();
+  
+  switch (state.status) {
+    case 'connecting':
+      return <Spinner>Connecting...</Spinner>;
+    
+    case 'connected':
+      return <Badge color="green">Connected</Badge>;
+    
+    case 'reconnecting':
+      return (
+        <Banner>
+          Reconnecting... (attempt {state.attempt})
+          {state.nextRetryMs && ` Next retry in ${Math.round(state.nextRetryMs / 1000)}s`}
+        </Banner>
+      );
+    
+    case 'disconnected':
+      return <Alert>Disconnected{state.reason && `: ${state.reason}`}</Alert>;
+    
+    case 'closed':
+      return <Badge color="gray">Connection closed</Badge>;
+  }
+}
+```
+
+**Connection Callbacks:**
+
+Use callbacks for side effects like logging, analytics, or notifications:
+
+```typescript
+initCapnWebSocket<MyApi>('ws://localhost:8080', {
+  onConnected: () => {
+    console.log('WebSocket connected');
+    analytics.track('ws_connected');
+  },
+  onDisconnected: (reason) => {
+    console.warn('WebSocket disconnected:', reason);
+  },
+  onReconnecting: (attempt) => {
+    toast.info(`Reconnecting (attempt ${attempt})...`);
+  },
+  onReconnectFailed: () => {
+    toast.error('Unable to reconnect. Please refresh the page.');
+  },
+});
 ```
 
 ### HTTP Batch Options
@@ -323,6 +462,8 @@ interface HttpBatchOptions {
   sessionOptions?: RpcSessionOptions; // Additional capnweb options
   onError?: (error: Error) => void; // Error handler
 }
+
+// Note: HTTP Batch has no persistent connection. close() disposes the session.
 ```
 
 ### MessagePort Options
@@ -331,8 +472,11 @@ interface HttpBatchOptions {
 interface MessagePortOptions {
   localMain?: any; // Local API for bidirectional RPC
   sessionOptions?: RpcSessionOptions; // Additional capnweb options
-  onDisconnect?: () => void; // Disconnect callback
+  onDisconnect?: () => void; // Disconnect callback (limited browser support)
 }
+
+// Note: onDisconnect uses the 'close' event which has limited browser support.
+// Connection persists across provider mount/unmount.
 ```
 
 ### Custom Transport Options
@@ -343,9 +487,36 @@ interface CustomTransportOptions {
   sessionOptions?: RpcSessionOptions; // Additional capnweb options
   onError?: (error: Error) => void; // Error handler
 }
+
+// Connection persists across provider mount/unmount.
 ```
 
 ## Features
+
+### Type Safety
+
+### WebSocket Connection Lifecycle
+
+The WebSocket connection persists across provider mount/unmount cycles. This means:
+
+- Connection is created once when the first provider mounts
+- Connection stays open even if the provider unmounts (e.g., during navigation)
+- Connection only closes when it disconnects/errors and exhausts retries, or when you call `close()`
+
+```typescript
+const { CapnWebProvider, close } = initCapnWebSocket<MyApi>('ws://localhost:8080/api');
+
+function App() {
+  useEffect(() => {
+    // Cleanup function to close connection when app unmounts
+    return () => close();
+  }, []);
+
+  return <CapnWebProvider><YourApp /></CapnWebProvider>;
+}
+```
+
+This design is efficient for app-level WebSocket connections that should survive navigation and component remounting.
 
 ### Type Safety
 

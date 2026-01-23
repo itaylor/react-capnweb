@@ -21,7 +21,7 @@
     "jsr:@zip-js/zip-js@2.7.41": "2.7.41",
     "npm:@types/react-dom@^19.2.3": "19.2.3_@types+react@19.2.7",
     "npm:@types/react@^19.2.7": "19.2.7",
-    "npm:capnweb@0.3.0": "0.3.0",
+    "npm:capnweb@0.4.0": "0.4.0",
     "npm:react-dom@^19.2.1": "19.2.1_react@19.2.1",
     "npm:react@^19.2.1": "19.2.1"
   },
@@ -125,8 +125,8 @@
         "csstype"
       ]
     },
-    "capnweb@0.3.0": {
-      "integrity": "sha512-H77DjTZBJFY2MauC4dWoj/uheOWA+1q+xLZosa7/QWHwy1eCLMv4iVjn2IIL4YB0+lwR61KvNK1BZIpskwZ8Gw=="
+    "capnweb@0.4.0": {
+      "integrity": "sha512-OgqPQcxnrAIqjrkAuwI4N9MP/mzseM5w9oLWb/oU63KveBJl1c8p41etLSVQUlYFiAYZu+h6/LJxKaDJd93xFw=="
     },
     "csstype@3.2.3": {
       "integrity": "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="
@@ -262,7 +262,7 @@
       "jsr:@deno/dnt@0.42.3",
       "npm:@types/react-dom@^19.2.3",
       "npm:@types/react@^19.2.7",
-      "npm:capnweb@0.3.0",
+      "npm:capnweb@0.4.0",
       "npm:react-dom@^19.2.1",
       "npm:react@^19.2.1"
     ]
