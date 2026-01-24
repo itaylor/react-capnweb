@@ -420,6 +420,40 @@ Deno.test('HTTP Batch - RPC API tests can be executed', async () => {
   }
 });
 
+Deno.test('HTTP Batch - useCapnWeb demo renders', async () => {
+  const browser = await launch({ headless: true });
+
+  try {
+    const page = await browser.newPage(
+      `http://${HTTP_BATCH_IP}:${DEFAULT_PORT}`,
+    );
+    setupErrorReporting(page);
+
+    await waitForElement(page, '[data-testid="http-batch-demo"]');
+
+    // Wait for useCapnWeb demo to render with Suspense
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Should show test results
+    const results = await waitForElement(
+      page,
+      '[data-testid="usecapnweb-test-results"]',
+    );
+    const resultsText = await results.innerText();
+
+    console.log('HTTP Batch useCapnWeb demo results:', resultsText);
+
+    // Should contain completion message
+    assertStringIncludes(
+      resultsText,
+      'completed',
+      'useCapnWeb demo should show results',
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
 Deno.test('HTTP Batch - Direct API call works', async () => {
   const browser = await launch({ headless: true });
 
@@ -472,24 +506,18 @@ Deno.test('HTTP Batch - Session can be closed manually', async () => {
 
     await waitForElement(page, '[data-testid="http-batch-demo"]');
 
-    // Click close session button
-    const closeBtn = await waitForElement(
-      page,
-      '[data-testid="close-session-btn"]',
-    );
-    await closeBtn.click();
-
-    // Should show confirmation
+    // HTTP Batch is stateless, so there's no session to close
+    // Just verify the UI reflects this
     await waitForElement(page, '[data-testid="close-confirmation"]');
     await waitForText(
       page,
       '[data-testid="close-confirmation"]',
-      'Session closed',
+      'HTTP Batch is stateless',
     );
 
-    // Button should be disabled - get fresh reference
-    const closeBtnAfter = await page.$('[data-testid="close-session-btn"]');
-    const isDisabled = await closeBtnAfter?.evaluate((el) =>
+    // Button should be disabled
+    const closeBtn = await page.$('[data-testid="close-session-btn"]');
+    const isDisabled = await closeBtn?.evaluate((el) =>
       (el as HTMLButtonElement).disabled
     );
     assertEquals(isDisabled, true, 'Close button should be disabled');

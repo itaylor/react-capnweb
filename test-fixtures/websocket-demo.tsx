@@ -108,6 +108,7 @@ function ManualConnectionControl() {
     <div className='test-section'>
       <h2>Manual Connection Control</h2>
       <button
+        type='button'
         className='action-button'
         onClick={handleClose}
         disabled={closed}
@@ -199,6 +200,7 @@ function ApiTests() {
     <div className='test-section'>
       <h2>RPC API Tests</h2>
       <button
+        type='button'
         className='action-button'
         onClick={runTests}
         disabled={isRunning}
@@ -229,6 +231,7 @@ function SuspenseTest() {
     <div className='test-section'>
       <h2>Suspense Integration Test</h2>
       <button
+        type='button'
         className='action-button'
         onClick={() => setUserId('user-123')}
         data-testid='load-with-suspense-btn'
@@ -236,6 +239,7 @@ function SuspenseTest() {
         Load Data with Suspense
       </button>
       <button
+        type='button'
         className='action-button'
         onClick={() => setUserId(null)}
         data-testid='clear-suspense-btn'

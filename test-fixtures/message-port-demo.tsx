@@ -2,11 +2,23 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { initCapnMessagePort } from '../message-port.tsx';
+import { newMessagePortRpcSession, RpcTarget } from 'capnweb';
 
 // Mock API interface for testing
-interface TestApi {
-  echo(message: string): Promise<string>;
-  add(a: number, b: number): Promise<number>;
+interface TestApi extends RpcTarget {
+  echo(message: string): string;
+  add(a: number, b: number): number;
+}
+
+// Server implementation for the worker side
+class TestApiImpl extends RpcTarget {
+  echo(message: string): string {
+    return message;
+  }
+
+  add(a: number, b: number): number {
+    return a + b;
+  }
 }
 
 // Create a MessageChannel for testing
@@ -23,43 +35,17 @@ const {
   },
 });
 
-// Simulate a "worker" on port2 that echoes messages back
+// Simulate a "worker" on port2 using capnweb RPC
 function setupSimulatedWorker() {
   const port2 = channel.port2;
 
-  port2.onmessage = (event) => {
-    console.log('[Simulated Worker] Received:', event.data);
-
-    // Simple echo/processing simulation
-    try {
-      const data = typeof event.data === 'string'
-        ? JSON.parse(event.data)
-        : event.data;
-
-      // Simulate processing based on method
-      if (data.method === 'echo') {
-        port2.postMessage(JSON.stringify({
-          result: data.params[0],
-          id: data.id,
-        }));
-      } else if (data.method === 'add') {
-        const sum = data.params[0] + data.params[1];
-        port2.postMessage(JSON.stringify({
-          result: sum,
-          id: data.id,
-        }));
-      } else {
-        port2.postMessage(JSON.stringify({
-          error: 'Unknown method',
-          id: data.id,
-        }));
-      }
-    } catch (error) {
-      console.error('[Simulated Worker] Error:', error);
-    }
-  };
-
-  port2.start();
+  try {
+    // Create a capnweb RPC session on the worker side
+    newMessagePortRpcSession(port2, new TestApiImpl());
+    console.log('[Simulated Worker] Capnweb RPC session initialized');
+  } catch (error) {
+    console.error('[Simulated Worker] Failed to initialize:', error);
+  }
 }
 
 function PortStatus() {
@@ -177,6 +163,7 @@ function ApiTests() {
     <div className='test-section'>
       <h2>RPC API Tests</h2>
       <button
+        type='button'
         className='action-button'
         onClick={runTests}
         disabled={isRunning}
@@ -213,6 +200,7 @@ function ManualPortControl() {
         are typically one-time use.
       </div>
       <button
+        type='button'
         className='action-button'
         onClick={handleClose}
         disabled={closed}
@@ -255,6 +243,7 @@ function DirectApiUsage() {
     <div className='test-section'>
       <h2>Direct API Usage (useCapnWebApi)</h2>
       <button
+        type='button'
         className='action-button'
         onClick={handleDirectCall}
         disabled={loading}

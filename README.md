@@ -95,10 +95,14 @@ Stateless HTTP requests for serverless and edge deployments.
 - Simple request/response patterns
 - Better proxy/load balancer compatibility
 
+**Note:** HTTP Batch sessions are single-use per batch. Each call to `useCapnWeb()` or `useCapnWebApi()` creates a new batch session. To batch multiple calls together, get the api once and make all calls before awaiting any of them.
+
+**Important:** `useCapnWebApi()` is not actually a React hook - it doesn't use context or state, just creates a fresh session. This means you can call it anywhere, including inside async functions and event handlers.
+
 ```typescript
 import { initCapnHttpBatch } from '@itaylor/react-capnweb/http-batch';
 
-const { CapnWebProvider, useCapnWeb, useCapnWebApi, close } = initCapnHttpBatch<MyApi>(
+const { CapnWebProvider, useCapnWeb, useCapnWebApi } = initCapnHttpBatch<MyApi>(
   '/api/rpc',
   {
     headers: { 'Authorization': 'Bearer token123' },
@@ -106,9 +110,28 @@ const { CapnWebProvider, useCapnWeb, useCapnWebApi, close } = initCapnHttpBatch<
   },
 );
 
-// Note: HTTP Batch has no persistent connection. close() disposes the session
-// and prevents further use.
-// close();
+function MyComponent() {
+  // ✅ Single batch - all calls in one HTTP request
+  const [user, posts, comments] = useCapnWeb((api) => {
+    const userPromise = api.getUser('123');
+    const postsPromise = api.getUserPosts('123');
+    const commentsPromise = api.getUserComments('123');
+    return Promise.all([userPromise, postsPromise, commentsPromise]);
+  }, ['123']);
+
+  // ✅ Or call useCapnWebApi in async handlers (NOT a real React hook!)
+  const handleAction = async () => {
+    // Each call to useCapnWebApi() creates a new session
+    const result1 = await useCapnWebApi().getUser('123'); // Batch 1
+    const result2 = await useCapnWebApi().getPosts('123'); // Batch 2
+    
+    // To batch multiple calls together, get api once before awaiting:
+    const api = useCapnWebApi();
+    const p1 = api.getUser('123');
+    const p2 = api.getComments('123');
+    const [user, comments] = await Promise.all([p1, p2]); // Single batch
+  };
+}
 ```
 
 ### MessagePort
@@ -285,8 +308,7 @@ const { CapnWebProvider } = initCapnWebSocket<ServerApi>(
 
 ### Common Interface
 
-All transport initialization functions return the same `CapnWebHooks<T>`
-interface:
+All transport initialization functions return the same `CapnWebHooks<T>` interface:
 
 ```typescript
 interface CapnWebHooks<T> {
@@ -300,12 +322,11 @@ interface CapnWebHooks<T> {
 }
 ```
 
-**Note:** All transports now include a `close()` function for manual resource cleanup.
-The specific behavior depends on the transport:
+**Note:** All transports include a `close()` function for manual resource cleanup:
 - **WebSocket**: Closes the connection and prevents reconnection
-- **HTTP Batch**: Disposes the session (no persistent connection to close)
 - **MessagePort**: Closes the port and disposes the session
 - **Custom Transport**: Calls `abort()` on the transport if available and disposes the session
+- **HTTP Batch**: No `close()` function; sessions are automatically cleaned up after each batch
 
 ### `CapnWebProvider`
 
@@ -462,8 +483,49 @@ interface HttpBatchOptions {
   sessionOptions?: RpcSessionOptions; // Additional capnweb options
   onError?: (error: Error) => void; // Error handler
 }
+```
 
-// Note: HTTP Batch has no persistent connection. close() disposes the session.
+**HTTP Batch behavioral notes:**
+
+HTTP Batch uses the same API as other transports, but has different session lifecycle behavior because capnweb HTTP Batch sessions are single-use per batch:
+
+- Each call to `useCapnWeb()` or `useCapnWebApi()` creates a new batch session
+- `useCapnWebApi()` is **not actually a React hook** - it doesn't use context or state, it just creates a fresh session each time. This means you can call it anywhere, including inside async functions and event handlers
+- To batch multiple calls together, get the api once and make all calls before awaiting any of them
+- Don't await inside the `useCapnWeb()` callback - the batch ends when you await
+
+**Batching examples:**
+
+```typescript
+// ✅ Single batch - get api once, make calls, then await
+const api = useCapnWebApi();
+const p1 = api.call1();
+const p2 = api.call2();
+const [r1, r2] = await Promise.all([p1, p2]); // Batch sent here
+
+// ✅ Single batch with useCapnWeb
+const result = useCapnWeb((api) => {
+  const p1 = api.call1();
+  const p2 = api.call2();
+  return Promise.all([p1, p2]);
+});
+
+// ✅ Promise pipelining (single batch)
+const result = useCapnWeb((api) => {
+  const userId = api.lookupUser('alice');
+  return api.getUserData(userId); // userId resolved on server
+});
+
+// ✅ Multiple batches - call useCapnWebApi() fresh each time (NOT a real hook!)
+const r1 = await useCapnWebApi().call1(); // HTTP request 1
+const r2 = await useCapnWebApi().call2(); // HTTP request 2
+
+// ❌ Won't work - awaiting inside useCapnWeb ends the batch
+const result = useCapnWeb(async (api) => {
+  const r1 = await api.call1(); // Batch ends here
+  const r2 = await api.call2(); // Session already closed!
+  return [r1, r2];
+});
 ```
 
 ### MessagePort Options
@@ -567,6 +629,9 @@ import { initCapnHttpBatch } from '@itaylor/react-capnweb/http-batch';
 | CDN compatible         | ❌        | ✅         | N/A         | Depends |
 | Worker/iframe support  | ❌        | ❌         | ✅          | Depends |
 | Latency                | Low       | Medium     | Very Low    | Depends |
+| Session lifecycle      | Long-lived | Single-use⁽¹⁾ | Long-lived  | Depends |
+
+**⁽¹⁾ Note:** HTTP Batch sessions are single-use per batch. Each call to `useCapnWeb()` or method call via `useCapnWebApi()` creates a new session. To batch multiple calls together, make all calls before awaiting any of them.
 
 ## Examples
 
@@ -580,6 +645,9 @@ your component code:
 const { CapnWebProvider, useCapnWeb, useCapnWebApi } = import.meta.env.DEV
   ? initCapnWebSocket('ws://localhost:8080')
   : initCapnHttpBatch('/api/rpc');
+
+// Note: HTTP Batch has single-use sessions, so you may need to adjust
+// batching strategy, but the API is the same
 ```
 
 ### Multi-Transport Application
@@ -587,20 +655,36 @@ const { CapnWebProvider, useCapnWeb, useCapnWebApi } = import.meta.env.DEV
 Use different transports for different purposes:
 
 ```typescript
-// Main API via HTTP for serverless
-const mainApi = initCapnHttpBatch<MainApi>('/api/rpc');
+// Main API via HTTP Batch for serverless
+const httpApi = initCapnHttpBatch<MainApi>('/api/rpc');
 
 // Real-time updates via WebSocket
-const realtimeApi = initCapnWebSocket<RealtimeApi>('ws://localhost:8080/live');
+const wsApi = initCapnWebSocket<RealtimeApi>('ws://localhost:8080/live');
 
 function App() {
   return (
-    <mainApi.CapnWebProvider>
-      <realtimeApi.CapnWebProvider>
+    <httpApi.CapnWebProvider>
+      <wsApi.CapnWebProvider>
         <YourApp />
-      </realtimeApi.CapnWebProvider>
-    </mainApi.CapnWebProvider>
+      </wsApi.CapnWebProvider>
+    </httpApi.CapnWebProvider>
   );
+}
+
+function YourApp() {
+  // Both use the same API!
+  const httpData = httpApi.useCapnWebApi();
+  const wsData = wsApi.useCapnWebApi();
+  
+  // HTTP Batch: batch calls together by not awaiting immediately
+  const loadData = async () => {
+    const p1 = httpData.getUser();
+    const p2 = httpData.getSettings();
+    const [user, settings] = await Promise.all([p1, p2]); // Single batch
+  };
+  
+  // WebSocket: call anytime
+  const subscribe = () => wsData.subscribe('updates');
 }
 ```
 
