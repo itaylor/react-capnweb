@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+// deno-lint-ignore no-unused-vars verbatim-module-syntax
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { initCapnMessagePort } from '../message-port.tsx';

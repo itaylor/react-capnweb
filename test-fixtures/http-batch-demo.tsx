@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+// deno-lint-ignore no-unused-vars verbatim-module-syntax
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { initCapnHttpBatch } from '../http-batch.tsx';

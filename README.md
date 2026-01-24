@@ -49,7 +49,13 @@ Persistent bidirectional connection for real-time communication.
 ```typescript
 import { initCapnWebSocket } from '@itaylor/react-capnweb/websocket';
 
-const { CapnWebProvider, useCapnWeb, useCapnWebApi, close, useConnectionState } = initCapnWebSocket<MyApi>(
+const {
+  CapnWebProvider,
+  useCapnWeb,
+  useCapnWebApi,
+  close,
+  useConnectionState,
+} = initCapnWebSocket<MyApi>(
   'ws://localhost:8080/api',
   {
     timeout: 5000, // Connection timeout in ms
@@ -70,7 +76,7 @@ const { CapnWebProvider, useCapnWeb, useCapnWebApi, close, useConnectionState } 
 // Track connection state in your components:
 function ConnectionStatus() {
   const state = useConnectionState();
-  
+
   if (state.status === 'connecting') {
     return <div>Connecting...</div>;
   }
@@ -95,9 +101,14 @@ Stateless HTTP requests for serverless and edge deployments.
 - Simple request/response patterns
 - Better proxy/load balancer compatibility
 
-**Note:** HTTP Batch sessions are single-use per batch. Each call to `useCapnWeb()` or `useCapnWebApi()` creates a new batch session. To batch multiple calls together, get the api once and make all calls before awaiting any of them.
+**Note:** HTTP Batch sessions are single-use per batch. Each call to
+`useCapnWeb()` or `useCapnWebApi()` creates a new batch session. To batch
+multiple calls together, get the api once and make all calls before awaiting any
+of them.
 
-**Important:** `useCapnWebApi()` is not actually a React hook - it doesn't use context or state, just creates a fresh session. This means you can call it anywhere, including inside async functions and event handlers.
+**Important:** `useCapnWebApi()` is not actually a React hook - it doesn't use
+context or state, just creates a fresh session. This means you can call it
+anywhere, including inside async functions and event handlers.
 
 ```typescript
 import { initCapnHttpBatch } from '@itaylor/react-capnweb/http-batch';
@@ -124,7 +135,7 @@ function MyComponent() {
     // Each call to useCapnWebApi() creates a new session
     const result1 = await useCapnWebApi().getUser('123'); // Batch 1
     const result2 = await useCapnWebApi().getPosts('123'); // Batch 2
-    
+
     // To batch multiple calls together, get api once before awaiting:
     const api = useCapnWebApi();
     const p1 = api.getUser('123');
@@ -150,7 +161,9 @@ import { initCapnMessagePort } from '@itaylor/react-capnweb/message-port';
 
 const channel = new MessageChannel();
 
-const { CapnWebProvider, useCapnWebApi, close } = initCapnMessagePort<WorkerApi>(
+const { CapnWebProvider, useCapnWebApi, close } = initCapnMessagePort<
+  WorkerApi
+>(
   channel.port1,
   {
     localMain: new ParentApi(), // Optional: expose API to worker
@@ -186,11 +199,12 @@ class MyTransport implements RpcTransport {
   abort?(reason: any): void {/* ... */}
 }
 
-const { CapnWebProvider, useCapnWeb, useCapnWebApi, close } = initCapnCustomTransport<
-  MyApi
->(new MyTransport(), {
-  localMain: new MyLocalApi(),
-});
+const { CapnWebProvider, useCapnWeb, useCapnWebApi, close } =
+  initCapnCustomTransport<
+    MyApi
+  >(new MyTransport(), {
+    localMain: new MyLocalApi(),
+  });
 
 // The transport connection persists across provider mount/unmount.
 // To manually close the connection when needed:
@@ -308,7 +322,8 @@ const { CapnWebProvider } = initCapnWebSocket<ServerApi>(
 
 ### Common Interface
 
-All transport initialization functions return the same `CapnWebHooks<T>` interface:
+All transport initialization functions return the same `CapnWebHooks<T>`
+interface:
 
 ```typescript
 interface CapnWebHooks<T> {
@@ -322,11 +337,15 @@ interface CapnWebHooks<T> {
 }
 ```
 
-**Note:** All transports include a `close()` function for manual resource cleanup:
+**Note:** All transports include a `close()` function for manual resource
+cleanup:
+
 - **WebSocket**: Closes the connection and prevents reconnection
 - **MessagePort**: Closes the port and disposes the session
-- **Custom Transport**: Calls `abort()` on the transport if available and disposes the session
-- **HTTP Batch**: No `close()` function; sessions are automatically cleaned up after each batch
+- **Custom Transport**: Calls `abort()` on the transport if available and
+  disposes the session
+- **HTTP Batch**: No `close()` function; sessions are automatically cleaned up
+  after each batch
 
 ### `CapnWebProvider`
 
@@ -399,51 +418,57 @@ type WebSocketConnectionState =
 
 **Backoff Strategy:**
 
-The `backoffStrategy` function controls the delay before each reconnection attempt. It receives the current retry count (1-indexed) and returns the delay in milliseconds.
+The `backoffStrategy` function controls the delay before each reconnection
+attempt. It receives the current retry count (1-indexed) and returns the delay
+in milliseconds.
 
 Default: Exponential backoff with jitter
+
 - Base delay: 1s, doubles each retry (1s, 2s, 4s, 8s, 16s, max 30s)
 - Adds random jitter of 0-1000ms to prevent thundering herd
 
 ```typescript
 // Custom fixed delay of 5 seconds
-backoffStrategy: () => 5000
+backoffStrategy: (() => 5000);
 
 // Linear backoff: 2s, 4s, 6s, 8s...
-backoffStrategy: (retryCount) => retryCount * 2000
+backoffStrategy: ((retryCount) => retryCount * 2000);
 
 // Custom exponential without jitter, max 60s
-backoffStrategy: (retryCount) => Math.min(1000 * Math.pow(2, retryCount - 1), 60000)
+backoffStrategy: ((retryCount) =>
+  Math.min(1000 * Math.pow(2, retryCount - 1), 60000));
 ```
 
 **Connection State Hook:**
 
-The `useConnectionState()` hook returns the current connection state, allowing you to display connection status in your UI.
+The `useConnectionState()` hook returns the current connection state, allowing
+you to display connection status in your UI.
 
 ```typescript
 function ConnectionIndicator() {
   const state = useConnectionState();
-  
+
   switch (state.status) {
     case 'connecting':
       return <Spinner>Connecting...</Spinner>;
-    
+
     case 'connected':
-      return <Badge color="green">Connected</Badge>;
-    
+      return <Badge color='green'>Connected</Badge>;
+
     case 'reconnecting':
       return (
         <Banner>
           Reconnecting... (attempt {state.attempt})
-          {state.nextRetryMs && ` Next retry in ${Math.round(state.nextRetryMs / 1000)}s`}
+          {state.nextRetryMs &&
+            ` Next retry in ${Math.round(state.nextRetryMs / 1000)}s`}
         </Banner>
       );
-    
+
     case 'disconnected':
       return <Alert>Disconnected{state.reason && `: ${state.reason}`}</Alert>;
-    
+
     case 'closed':
-      return <Badge color="gray">Connection closed</Badge>;
+      return <Badge color='gray'>Connection closed</Badge>;
   }
 }
 ```
@@ -487,11 +512,15 @@ interface HttpBatchOptions {
 
 **HTTP Batch behavioral notes:**
 
-HTTP Batch uses the same API as other transports, but has different session lifecycle behavior because capnweb HTTP Batch sessions are single-use per batch:
+HTTP Batch uses the same API as other transports, but has different session
+lifecycle behavior because capnweb HTTP Batch sessions are single-use per batch:
 
 - Each call to `useCapnWeb()` or `useCapnWebApi()` creates a new batch session
-- `useCapnWebApi()` is **not actually a React hook** - it doesn't use context or state, it just creates a fresh session each time. This means you can call it anywhere, including inside async functions and event handlers
-- To batch multiple calls together, get the api once and make all calls before awaiting any of them
+- `useCapnWebApi()` is **not actually a React hook** - it doesn't use context or
+  state, it just creates a fresh session each time. This means you can call it
+  anywhere, including inside async functions and event handlers
+- To batch multiple calls together, get the api once and make all calls before
+  awaiting any of them
 - Don't await inside the `useCapnWeb()` callback - the batch ends when you await
 
 **Batching examples:**
@@ -559,14 +588,18 @@ interface CustomTransportOptions {
 
 ### WebSocket Connection Lifecycle
 
-The WebSocket connection persists across provider mount/unmount cycles. This means:
+The WebSocket connection persists across provider mount/unmount cycles. This
+means:
 
 - Connection is created once when the first provider mounts
 - Connection stays open even if the provider unmounts (e.g., during navigation)
-- Connection only closes when it disconnects/errors and exhausts retries, or when you call `close()`
+- Connection only closes when it disconnects/errors and exhausts retries, or
+  when you call `close()`
 
 ```typescript
-const { CapnWebProvider, close } = initCapnWebSocket<MyApi>('ws://localhost:8080/api');
+const { CapnWebProvider, close } = initCapnWebSocket<MyApi>(
+  'ws://localhost:8080/api',
+);
 
 function App() {
   useEffect(() => {
@@ -574,11 +607,16 @@ function App() {
     return () => close();
   }, []);
 
-  return <CapnWebProvider><YourApp /></CapnWebProvider>;
+  return (
+    <CapnWebProvider>
+      <YourApp />
+    </CapnWebProvider>
+  );
 }
 ```
 
-This design is efficient for app-level WebSocket connections that should survive navigation and component remounting.
+This design is efficient for app-level WebSocket connections that should survive
+navigation and component remounting.
 
 ### Type Safety
 
@@ -619,19 +657,21 @@ import { initCapnHttpBatch } from '@itaylor/react-capnweb/http-batch';
 
 ## Comparison of Transports
 
-| Feature                | WebSocket | HTTP Batch | MessagePort | Custom  |
-| ---------------------- | --------- | ---------- | ----------- | ------- |
-| Persistent connection  | ✅        | ❌         | ✅          | Depends |
-| Automatic reconnection | ✅        | N/A        | ❌          | Custom  |
-| Bidirectional RPC      | ✅        | ❌         | ✅          | Depends |
-| Server push            | ✅        | ❌         | ✅          | Depends |
-| Serverless friendly    | ❌        | ✅         | N/A         | Depends |
-| CDN compatible         | ❌        | ✅         | N/A         | Depends |
-| Worker/iframe support  | ❌        | ❌         | ✅          | Depends |
-| Latency                | Low       | Medium     | Very Low    | Depends |
+| Feature                | WebSocket  | HTTP Batch    | MessagePort | Custom  |
+| ---------------------- | ---------- | ------------- | ----------- | ------- |
+| Persistent connection  | ✅         | ❌            | ✅          | Depends |
+| Automatic reconnection | ✅         | N/A           | ❌          | Custom  |
+| Bidirectional RPC      | ✅         | ❌            | ✅          | Depends |
+| Server push            | ✅         | ❌            | ✅          | Depends |
+| Serverless friendly    | ❌         | ✅            | N/A         | Depends |
+| CDN compatible         | ❌         | ✅            | N/A         | Depends |
+| Worker/iframe support  | ❌         | ❌            | ✅          | Depends |
+| Latency                | Low        | Medium        | Very Low    | Depends |
 | Session lifecycle      | Long-lived | Single-use⁽¹⁾ | Long-lived  | Depends |
 
-**⁽¹⁾ Note:** HTTP Batch sessions are single-use per batch. Each call to `useCapnWeb()` or method call via `useCapnWebApi()` creates a new session. To batch multiple calls together, make all calls before awaiting any of them.
+**⁽¹⁾ Note:** HTTP Batch sessions are single-use per batch. Each call to
+`useCapnWeb()` or method call via `useCapnWebApi()` creates a new session. To
+batch multiple calls together, make all calls before awaiting any of them.
 
 ## Examples
 
@@ -675,14 +715,14 @@ function YourApp() {
   // Both use the same API!
   const httpData = httpApi.useCapnWebApi();
   const wsData = wsApi.useCapnWebApi();
-  
+
   // HTTP Batch: batch calls together by not awaiting immediately
   const loadData = async () => {
     const p1 = httpData.getUser();
     const p2 = httpData.getSettings();
     const [user, settings] = await Promise.all([p1, p2]); // Single batch
   };
-  
+
   // WebSocket: call anytime
   const subscribe = () => wsData.subscribe('updates');
 }
