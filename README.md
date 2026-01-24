@@ -1,8 +1,7 @@
 # react-capnweb
 
 React hooks and components for
-[capnweb](https://github.com/cloudflare/capnweb) - RPC with Cap'n Proto over
-multiple transport protocols.
+[capnweb](https://github.com/cloudflare/capnweb) - A JavaScript-native RPC system, supporting multiple transport protocols.
 
 ## Overview
 
