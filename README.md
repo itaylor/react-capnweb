@@ -33,183 +33,6 @@ deno add @itaylor/react-capnweb
 npm install @itaylor/react-capnweb
 ```
 
-## Transport Options
-
-### WebSocket
-
-Persistent bidirectional connection for real-time communication.
-
-**Best for:**
-
-- Real-time applications
-- Long-lived connections
-- Server-initiated updates
-- Low-latency requirements
-
-```typescript
-import { initCapnWebSocket } from '@itaylor/react-capnweb/websocket';
-
-const {
-  CapnWebProvider,
-  useCapnWeb,
-  useCapnWebApi,
-  close,
-  useConnectionState,
-} = initCapnWebSocket<MyApi>(
-  'ws://localhost:8080/api',
-  {
-    timeout: 5000, // Connection timeout in ms
-    retries: 10, // Max reconnection attempts
-    backoffStrategy: (retryCount) => retryCount * 1000, // Optional: custom backoff
-    localMain: new MyClientApi(), // Optional: expose API to server
-    onConnected: () => console.log('Connected!'),
-    onDisconnected: (reason) => console.log('Disconnected:', reason),
-    onReconnecting: (attempt) => console.log('Reconnecting, attempt', attempt),
-    onReconnectFailed: () => console.log('All retries exhausted'),
-  },
-);
-
-// The WebSocket connection persists across provider mount/unmount.
-// To manually close the connection when needed:
-// close();
-
-// Track connection state in your components:
-function ConnectionStatus() {
-  const state = useConnectionState();
-
-  if (state.status === 'connecting') {
-    return <div>Connecting...</div>;
-  }
-  if (state.status === 'reconnecting') {
-    return <div>Reconnecting (attempt {state.attempt})...</div>;
-  }
-  if (state.status === 'connected') {
-    return <div>Connected</div>;
-  }
-  return <div>Disconnected</div>;
-}
-```
-
-### HTTP Batch
-
-Stateless HTTP requests for serverless and edge deployments.
-
-**Best for:**
-
-- Serverless/edge functions
-- CDN-friendly applications
-- Simple request/response patterns
-- Better proxy/load balancer compatibility
-
-**Note:** HTTP Batch sessions are single-use per batch. Each call to
-`useCapnWeb()` or `useCapnWebApi()` creates a new batch session. To batch
-multiple calls together, get the api once and make all calls before awaiting any
-of them.
-
-**Important:** `useCapnWebApi()` is not actually a React hook - it doesn't use
-context or state, just creates a fresh session. This means you can call it
-anywhere, including inside async functions and event handlers.
-
-```typescript
-import { initCapnHttpBatch } from '@itaylor/react-capnweb/http-batch';
-
-const { CapnWebProvider, useCapnWeb, useCapnWebApi } = initCapnHttpBatch<MyApi>(
-  '/api/rpc',
-  {
-    headers: { 'Authorization': 'Bearer token123' },
-    credentials: 'include',
-  },
-);
-
-function MyComponent() {
-  // ✅ Single batch - all calls in one HTTP request
-  const [user, posts, comments] = useCapnWeb((api) => {
-    const userPromise = api.getUser('123');
-    const postsPromise = api.getUserPosts('123');
-    const commentsPromise = api.getUserComments('123');
-    return Promise.all([userPromise, postsPromise, commentsPromise]);
-  }, ['123']);
-
-  // ✅ Or call useCapnWebApi in async handlers (NOT a real React hook!)
-  const handleAction = async () => {
-    // Each call to useCapnWebApi() creates a new session
-    const result1 = await useCapnWebApi().getUser('123'); // Batch 1
-    const result2 = await useCapnWebApi().getPosts('123'); // Batch 2
-
-    // To batch multiple calls together, get api once before awaiting:
-    const api = useCapnWebApi();
-    const p1 = api.getUser('123');
-    const p2 = api.getComments('123');
-    const [user, comments] = await Promise.all([p1, p2]); // Single batch
-  };
-}
-```
-
-### MessagePort
-
-Communication with Web Workers, iframes, and Service Workers.
-
-**Best for:**
-
-- Web Worker communication
-- iframe messaging
-- Service Worker integration
-- Isolated JavaScript contexts
-
-```typescript
-import { initCapnMessagePort } from '@itaylor/react-capnweb/message-port';
-
-const channel = new MessageChannel();
-
-const { CapnWebProvider, useCapnWebApi, close } = initCapnMessagePort<
-  WorkerApi
->(
-  channel.port1,
-  {
-    localMain: new ParentApi(), // Optional: expose API to worker
-  },
-);
-
-// The MessagePort connection persists across provider mount/unmount.
-// To manually close the connection when needed:
-// close();
-
-// Send port2 to worker
-worker.postMessage({ port: channel.port2 }, [channel.port2]);
-```
-
-### Custom Transport
-
-Implement your own transport for custom protocols.
-
-**Best for:**
-
-- Custom networking protocols
-- Testing with mock transports
-- Adding middleware (logging, encryption)
-- Specialized communication channels
-
-```typescript
-import { initCapnCustomTransport } from '@itaylor/react-capnweb/custom-transport';
-import type { RpcTransport } from 'capnweb';
-
-class MyTransport implements RpcTransport {
-  async send(message: string): Promise<void> {/* ... */}
-  async receive(): Promise<string> {/* ... */}
-  abort?(reason: any): void {/* ... */}
-}
-
-const { CapnWebProvider, useCapnWeb, useCapnWebApi, close } =
-  initCapnCustomTransport<
-    MyApi
-  >(new MyTransport(), {
-    localMain: new MyLocalApi(),
-  });
-
-// The transport connection persists across provider mount/unmount.
-// To manually close the connection when needed:
-// close();
-```
 
 ## Usage
 
@@ -317,6 +140,189 @@ const { CapnWebProvider } = initCapnWebSocket<ServerApi>(
   },
 );
 ```
+
+
+## Transport Options
+
+### WebSocket
+
+Persistent bidirectional connection for real-time communication.
+
+**Best for:**
+
+- Real-time applications
+- Long-lived connections
+- Server-initiated updates
+- Low-latency requirements
+
+```typescript
+import { initCapnWebSocket } from '@itaylor/react-capnweb/websocket';
+
+const {
+  CapnWebProvider,
+  useCapnWeb,
+  useCapnWebApi,
+  close,
+  useConnectionState,
+} = initCapnWebSocket<MyApi>(
+  'ws://localhost:8080/api',
+  {
+    timeout: 5000, // Connection timeout in ms
+    retries: 10, // Max reconnection attempts
+    backoffStrategy: (retryCount) => retryCount * 1000, // Optional: custom backoff
+    localMain: new MyClientApi(), // Optional: expose API to server
+    onConnected: () => console.log('Connected!'),
+    onDisconnected: (reason) => console.log('Disconnected:', reason),
+    onReconnecting: (attempt) => console.log('Reconnecting, attempt', attempt),
+    onReconnectFailed: () => console.log('All retries exhausted'),
+  },
+);
+
+// The WebSocket connection persists across provider mount/unmount.
+// To manually close the connection when needed:
+// close();
+
+// Track connection state in your components:
+function ConnectionStatus() {
+  const state = useConnectionState();
+
+  if (state.status === 'connecting') {
+    return <div>Connecting...</div>;
+  }
+  if (state.status === 'reconnecting') {
+    return <div>Reconnecting (attempt {state.attempt})...</div>;
+  }
+  if (state.status === 'connected') {
+    return <div>Connected</div>;
+  }
+  return <div>Disconnected</div>;
+}
+```
+
+### HTTP Batch
+
+Stateless HTTP requests for serverless and edge deployments.
+
+**Best for:**
+
+- Serverless/edge functions
+- CDN-friendly applications
+- Simple request/response patterns
+- Better proxy/load balancer compatibility
+
+**Note:** HTTP Batch sessions are single-use per batch. Each call to
+`useCapnWeb()` or `useCapnWebApi()` creates a new batch session. To batch
+multiple calls together, get the api once and make all calls before awaiting any
+of them.
+
+**Important:** `useCapnWebApi()` is not actually a React hook - it doesn't use
+context or state, just creates a fresh session. This means you can call it
+anywhere, including inside async functions and event handlers.
+
+```typescript
+import { initCapnHttpBatch } from '@itaylor/react-capnweb/http-batch';
+
+const { CapnWebProvider, useCapnWeb, useCapnWebApi } = initCapnHttpBatch<MyApi>(
+  '/api/rpc',
+  {
+    headers: { 'Authorization': 'Bearer token123' },
+    credentials: 'include',
+  },
+);
+
+function MyComponent() {
+  const executeBatch = useCapnWebBatch();
+
+  // ✅ Single batch - all calls in one HTTP request
+  const [user, posts, comments] = useCapnWeb((api) => {
+    const userPromise = api.getUser('123');
+    const postsPromise = api.getUserPosts('123');
+    const commentsPromise = api.getUserComments('123');
+    return Promise.all([userPromise, postsPromise, commentsPromise]);
+  }, ['123']);
+
+  // ✅ Or call useCapnWebApi in async handlers (NOT a real React hook!)
+  const handleAction = async () => {
+    // Each call to useCapnWebApi() creates a new session
+    const result1 = await useCapnWebApi().getUser('123'); // Batch 1
+    const result2 = await useCapnWebApi().getPosts('123'); // Batch 2
+
+    // To batch multiple calls together, get api once before awaiting:
+    const api = useCapnWebApi();
+    const p1 = api.getUser('123');
+    const p2 = api.getComments('123');
+    const [user, comments] = await Promise.all([p1, p2]); // Single batch
+  };
+}
+```
+
+### MessagePort
+
+Communication with Web Workers, iframes, and Service Workers.
+
+**Best for:**
+
+- Web Worker communication
+- iframe messaging
+- Service Worker integration
+- Isolated JavaScript contexts
+
+```typescript
+import { initCapnMessagePort } from '@itaylor/react-capnweb/message-port';
+
+const channel = new MessageChannel();
+
+const { CapnWebProvider, useCapnWebApi, close } = initCapnMessagePort<
+  WorkerApi
+>(
+  channel.port1,
+  {
+    localMain: new ParentApi(), // Optional: expose API to worker
+  },
+);
+
+// The MessagePort connection persists across provider mount/unmount.
+// To manually close the connection when needed:
+// close();
+
+// Send port2 to worker
+worker.postMessage({ port: channel.port2 }, [channel.port2]);
+```
+
+### Custom Transport
+
+Implement your own transport for custom protocols.
+
+**Best for:**
+
+- Custom networking protocols
+- Testing with mock transports
+- Adding middleware (logging, encryption)
+- Specialized communication channels
+
+```typescript
+import { initCapnCustomTransport } from '@itaylor/react-capnweb/custom-transport';
+import type { RpcTransport } from 'capnweb';
+
+class MyTransport implements RpcTransport {
+  async send(message: string): Promise<void> {/* ... */}
+  async receive(): Promise<string> {/* ... */}
+  abort?(reason: any): void {/* ... */}
+}
+
+const { CapnWebProvider, useCapnWeb, useCapnWebApi, close } =
+  initCapnCustomTransport<
+    MyApi
+  >(new MyTransport(), {
+    localMain: new MyLocalApi(),
+  });
+
+// The transport connection persists across provider mount/unmount.
+// To manually close the connection when needed:
+// close();
+```
+
+
 
 ## API Reference
 
