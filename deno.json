@@ -55,7 +55,7 @@
     "singleQuote": true
   },
   "compilerOptions": {
-    "lib": ["dom", "esnext", "dom.iterable"],
+    "lib": ["dom", "esnext", "dom.iterable", "esnext.disposable"],
     "jsx": "react-jsx",
     "jsxImportSource": "npm:react@^19.2.1",
     "jsxImportSourceTypes": "@types/react"

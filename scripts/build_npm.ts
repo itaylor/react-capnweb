@@ -107,8 +107,8 @@ await build({
     console.log('✅ Dependencies key deleted from npm/package.json');
   },
   compilerOptions: {
-    target: 'ES2020',
-    lib: ['ES2020', 'DOM', 'DOM.Iterable'],
+    target: 'ES2022',
+    lib: ['ES2022', 'DOM', 'DOM.Iterable', 'ESNext.Disposable'],
   },
   typeCheck: 'both',
   declaration: 'separate',
