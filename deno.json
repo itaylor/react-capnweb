@@ -1,7 +1,7 @@
 {
   "name": "@itaylor/react-capnweb",
-  "version": "1.0.0",
-  "description": "React hooks and components for capnweb - WebSocket RPC with Cap'n Proto",
+  "version": "0.0.1",
+  "description": "React hooks and components for capnweb - A JavaScript-native RPC system, supporting multiple transport protocols",
   "exports": {
     ".": "./mod.tsx",
     "./websocket": "./websocket.tsx",
