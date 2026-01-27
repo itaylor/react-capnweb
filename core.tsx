@@ -1,13 +1,6 @@
 // deno-lint-ignore verbatim-module-syntax
 import * as React from 'react';
-import {
-  createContext,
-  use,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { createContext, use, useContext, useEffect, useState } from 'react';
 import type { RpcCompatible } from 'capnweb';
 
 // Opaque type to avoid deep type instantiation with RpcCompatible
@@ -115,20 +108,15 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
     fn: (api: RpcApi<T>) => Promise<TResult>,
     deps: any[] = [],
   ): TResult | undefined {
-    const api = useCapnWebApi();
-    const isFirstRender = useRef(true);
+    // Create promise immediately on first render to avoid returning undefined
+    const session = useCapnWebApi();
 
-    // Initialize promise immediately on first render to avoid returning undefined
-    const [prom, setProm] = useState<Promise<TResult> | null>(() => fn(api));
-
+    const [prom, setProm] = React.useState<Promise<TResult> | null>(null);
     useEffect(() => {
-      // Skip first effect run since we already created the promise in useState
-      if (isFirstRender.current) {
-        isFirstRender.current = false;
-        return;
-      }
-      setProm(fn(api));
-    }, [api, ...deps]);
+      const rpcPromise = fn(session as RpcApi<T>);
+      // Wrap RpcPromise in a real Promise so React's use() can handle it
+      setProm(Promise.resolve(rpcPromise));
+    }, deps);
 
     if (prom) {
       return use(prom);

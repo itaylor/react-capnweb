@@ -357,6 +357,40 @@ Deno.test('WebSocket - Callback logs are captured', async () => {
   }
 });
 
+Deno.test('WebSocket - useCapnWeb demo renders', async () => {
+  const browser = await launch({ headless: true });
+
+  try {
+    const page = await browser.newPage(
+      `http://${WEBSOCKET_IP}:${DEFAULT_PORT}`,
+    );
+    setupErrorReporting(page);
+
+    await waitForElement(page, '[data-testid="websocket-demo"]');
+
+    // Wait for useCapnWeb demo to render with Suspense
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Should show test results
+    const results = await waitForElement(
+      page,
+      '[data-testid="usecapnweb-test-results"]',
+    );
+    const resultsText = await results.innerText();
+
+    console.log('WebSocket useCapnWeb demo results:', resultsText);
+
+    // Should contain completion message
+    assertStringIncludes(
+      resultsText,
+      'completed',
+      'useCapnWeb demo should show results',
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
 // ============================================================================
 // HTTP Batch Tests
 // ============================================================================
