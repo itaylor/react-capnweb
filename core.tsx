@@ -1,17 +1,16 @@
 // deno-lint-ignore verbatim-module-syntax
 import * as React from 'react';
 import { createContext, use, useContext, useEffect, useState } from 'react';
-import type { RpcCompatible } from 'capnweb';
+import type { RpcCompatible, RpcStub } from 'capnweb';
 
-// Opaque type to avoid deep type instantiation with RpcCompatible
-// TODO: Can potentially be replaced with RpcStub<T> once we resolve type constraints
-export type RpcApi<T> = T & { __rpcApi: never };
+// RpcStub from capnweb supports promise pipelining where RpcPromise values can be passed as parameters
+// We use 'any' in the interface to avoid type constraint issues, but RpcStub<T> in implementations
 
 /**
  * Interface for the hooks returned by all transport initialization functions.
  * This ensures a consistent API across all transports (WebSocket, HTTP Batch, MessagePort, etc.)
  */
-export interface CapnWebHooks<T> {
+export interface CapnWebHooks<T extends RpcCompatible<T>> {
   /**
    * Provider component that manages the RPC session lifecycle.
    * Wrap your application or component tree with this provider.
@@ -29,7 +28,7 @@ export interface CapnWebHooks<T> {
    * @returns The resolved value from the RPC call
    */
   useCapnWeb: <TResult>(
-    fn: (api: RpcApi<T>) => Promise<TResult>,
+    fn: (api: RpcStub<T>) => Promise<TResult>,
     deps?: any[],
   ) => TResult | undefined;
 
@@ -39,7 +38,7 @@ export interface CapnWebHooks<T> {
    *
    * @returns The RPC API stub
    */
-  useCapnWebApi: () => RpcApi<T>;
+  useCapnWebApi: () => RpcStub<T>;
 
   /**
    * Manually close the connection and dispose the session.
@@ -105,15 +104,15 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
    * ```
    */
   function useCapnWeb<TResult>(
-    fn: (api: RpcApi<T>) => Promise<TResult>,
+    fn: (api: RpcStub<T>) => Promise<TResult>,
     deps: any[] = [],
   ): TResult | undefined {
     // Create promise immediately on first render to avoid returning undefined
-    const session = useCapnWebApi();
+    const session = useCapnWebApi() as any;
 
     const [prom, setProm] = React.useState<Promise<TResult> | null>(null);
     useEffect(() => {
-      const rpcPromise = fn(session as RpcApi<T>);
+      const rpcPromise = fn(session);
       // Wrap RpcPromise in a real Promise so React's use() can handle it
       setProm(Promise.resolve(rpcPromise));
     }, deps);
@@ -124,19 +123,19 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
     return undefined;
   }
 
-  function useCapnWebApi(): RpcApi<T> {
+  function useCapnWebApi(): RpcStub<T> {
     const api = useContext(apiContext);
     if (!api) {
       throw new Error('useCapnWebApi must be used within a CapnWebProvider');
     }
 
-    return api as RpcApi<T>;
+    return api as RpcStub<T>;
   }
 
   return {
     useCapnWeb,
     useCapnWebApi,
-  };
+  } as Omit<CapnWebHooks<T>, 'CapnWebProvider' | 'close'>;
 }
 
 /**

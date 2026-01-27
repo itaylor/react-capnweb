@@ -12,7 +12,8 @@
  */
 
 // Re-export core types
-export type { CapnWebHooks, RpcApi } from './core.tsx';
+export type { CapnWebHooks } from './core.tsx';
+// Note: RpcStub is available from 'capnweb' package for promise pipelining support
 
 // Re-export WebSocket transport
 export {

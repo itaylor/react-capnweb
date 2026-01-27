@@ -1,4 +1,4 @@
-import type { RpcCompatible, RpcSessionOptions } from 'capnweb';
+import type { RpcCompatible, RpcSessionOptions, RpcStub } from 'capnweb';
 import { newHttpBatchRpcSession } from 'capnweb';
 import type { CapnWebHooks } from './core.tsx';
 import { use, useEffect } from 'react';
@@ -52,10 +52,7 @@ export interface HttpBatchOptions {
   onError?: (error: Error) => void;
 }
 
-// Opaque type to avoid deep type instantiation with RpcCompatible
-// TODO: Can potentially be replaced with RpcStub<T> once we resolve type constraints
-//
-export type RpcApi<T> = T & { __rpcApi: never };
+// RpcStub from capnweb supports promise pipelining where RpcPromise values can be passed as parameters
 /**
  * Initialize a capnweb HTTP Batch RPC connection with React hooks.
  *
@@ -173,14 +170,14 @@ export function initCapnHttpBatch<T extends RpcCompatible<T>>(
   }
 
   function useCapnWeb<TResult>(
-    fn: (api: RpcApi<T>) => Promise<TResult>,
+    fn: (api: RpcStub<T>) => Promise<TResult>,
     deps: any[] = [],
   ): TResult | undefined {
     // Create promise immediately on first render to avoid returning undefined
     const [prom, setProm] = React.useState<Promise<TResult> | null>(null);
     useEffect(() => {
-      const session = useCapnWebApi();
-      const rpcPromise = fn(session as RpcApi<T>);
+      const session = useCapnWebApi() as any;
+      const rpcPromise = fn(session);
       // Wrap RpcPromise in a real Promise so React's use() can handle it
       setProm(Promise.resolve(rpcPromise));
     }, deps);
@@ -191,12 +188,12 @@ export function initCapnHttpBatch<T extends RpcCompatible<T>>(
     return undefined;
   }
 
-  function useCapnWebApi(): RpcApi<T> {
+  function useCapnWebApi(): RpcStub<T> {
     const session = newHttpBatchRpcSession<T>(
       request.clone(),
       options.sessionOptions,
     ) as any;
-    return session;
+    return session as RpcStub<T>;
   }
 
   function close() {
@@ -208,5 +205,5 @@ export function initCapnHttpBatch<T extends RpcCompatible<T>>(
     useCapnWeb,
     useCapnWebApi,
     close,
-  };
+  } as CapnWebHooks<T>;
 }

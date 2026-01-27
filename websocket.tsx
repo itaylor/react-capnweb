@@ -91,7 +91,8 @@ export interface WebSocketOptions {
 /**
  * Extended hooks interface that includes WebSocket-specific methods.
  */
-export interface WebSocketCapnWebHooks<T> extends CapnWebHooks<T> {
+export interface WebSocketCapnWebHooks<T extends RpcCompatible<T>>
+  extends CapnWebHooks<T> {
   /**
    * Hook to access the current WebSocket connection state.
    * Returns state object with status and additional information.

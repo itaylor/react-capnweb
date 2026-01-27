@@ -21,6 +21,7 @@
     "jsr:@zip-js/zip-js@2.7.41": "2.7.41",
     "npm:@types/react-dom@^19.2.3": "19.2.3_@types+react@19.2.7",
     "npm:@types/react@^19.2.7": "19.2.7",
+    "npm:capnweb@*": "0.4.0",
     "npm:capnweb@0.4.0": "0.4.0",
     "npm:react-dom@^19.2.1": "19.2.1_react@19.2.1",
     "npm:react@^19.2.1": "19.2.1"

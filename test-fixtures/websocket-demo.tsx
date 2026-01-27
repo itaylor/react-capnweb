@@ -229,8 +229,8 @@ function UseCapnWebTests() {
   // Simple demonstration of useCapnWeb's promise chaining.
   const result = useCapnWeb((api) => {
     const p1 = api.add(1, 1);
-    const p2 = api.add(p1 as any as number, 2);
-    return api.add(p2 as any as number, 4);
+    const p2 = api.add(p1, 2);
+    return api.add(p2, 4);
   });
 
   const isValid = result === 8;
