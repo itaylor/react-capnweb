@@ -58,6 +58,7 @@ export interface CapnWebHooks<T extends RpcCompatible<T>> {
 export function createHooksForContext<T extends RpcCompatible<T>>(
   apiContext: React.Context<any>,
 ): Omit<CapnWebHooks<T>, 'CapnWebProvider' | 'close'> {
+
   /**
    * Hook for making RPC calls with React Suspense support.
    *
@@ -107,20 +108,44 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
     fn: (api: RpcStub<T>) => Promise<TResult>,
     deps: any[] = [],
   ): TResult | undefined {
-    // Create promise immediately on first render to avoid returning undefined
-    const session = useCapnWebApi() as any;
-
-    const [prom, setProm] = React.useState<Promise<TResult> | null>(null);
+    const api = useCapnWebApi() as any;
+    const [prom, setProm] = useState<Promise<TResult> | null>(null);
     useEffect(() => {
-      const rpcPromise = fn(session);
-      // Wrap RpcPromise in a real Promise so React's use() can handle it
-      setProm(Promise.resolve(rpcPromise));
-    }, deps);
-
+      setProm(fn(api));
+    }, [api, ...deps]);
     if (prom) {
       return use(prom);
     }
-    return undefined;
+  }
+
+  type RpcApiNames = T[ keyof T ];
+  type RpcFunction = T[RpcApiNames] ;
+  const promiseCache = new WeakMap<any, WeakMap<any, Promise<any>>>();
+  
+  function useCapnWeb2<X extends RpcApiNames>(
+    apiName: X,
+    ...args: Parameters<RpcFunction>
+  ): ReturnType<RpcFunction[typeof api]> {
+    const api = useCapnWebApi();
+    let argsMap = promiseCache.get(api);
+    let promise = argsMap?.get(args);
+    if (promise) {
+      return use(promise);
+    }
+    let pc = promiseCache.get(api);
+    if (!pc) {
+      pc = new WeakMap();
+      promiseCache.set(api, pc);
+    }
+    let prom = pc.get(args);
+    if (!prom) {
+      prom = Promise.resolve(api[apiName](...args));
+      prom.finally(() => {
+        pc.delete(args);
+      })
+      pc.set(args, prom);
+    }
+    return use(prom);
   }
 
   function useCapnWebApi(): RpcStub<T> {
