@@ -32,6 +32,17 @@ export interface CapnWebHooks<T extends RpcCompatible<T>> {
     deps?: any[],
   ) => TResult | undefined;
 
+  useCapnWeb2<K extends keyof T>(
+    apiName: K,
+    ...args: T[K] extends (...args: infer P) => any ? P : never
+  ): T[K] extends (...args: any[]) => Promise<infer R> ? R : never;
+
+  useCapnWeb3<R>(
+    operationName: string,
+    fn: (api: RpcStub<T>) => Promise<R>,
+    ...deps: any[]
+  ): R;
+
   /**
    * Hook for direct access to the RPC API.
    * Use this for more control over when and how RPC calls are made.
@@ -55,10 +66,10 @@ export interface CapnWebHooks<T extends RpcCompatible<T>> {
  * @param apiContext - React context that holds the RPC session/stub
  * @returns Hook functions (useCapnWeb and useCapnWebApi)
  */
+
 export function createHooksForContext<T extends RpcCompatible<T>>(
   apiContext: React.Context<any>,
 ): Omit<CapnWebHooks<T>, 'CapnWebProvider' | 'close'> {
-
   /**
    * Hook for making RPC calls with React Suspense support.
    *
@@ -111,41 +122,75 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
     const api = useCapnWebApi() as any;
     const [prom, setProm] = useState<Promise<TResult> | null>(null);
     useEffect(() => {
-      setProm(fn(api));
+      setProm(Promise.resolve(fn(api)));
     }, [api, ...deps]);
     if (prom) {
       return use(prom);
     }
   }
 
-  type RpcApiNames = T[ keyof T ];
-  type RpcFunction = T[RpcApiNames] ;
-  const promiseCache = new WeakMap<any, WeakMap<any, Promise<any>>>();
-  
-  function useCapnWeb2<X extends RpcApiNames>(
-    apiName: X,
-    ...args: Parameters<RpcFunction>
-  ): ReturnType<RpcFunction[typeof api]> {
-    const api = useCapnWebApi();
-    let argsMap = promiseCache.get(api);
-    let promise = argsMap?.get(args);
-    if (promise) {
-      return use(promise);
+  type PromiseTracker = {
+    status: 'pending' | 'resolved' | 'rejected';
+    promise: Promise<any>;
+  };
+
+  const promiseCache = new Map<string, PromiseTracker>();
+  function cleanCache(cacheKey: string, deletePending: boolean = false) {
+    const val = promiseCache.get(cacheKey);
+    if (deletePending || val?.status !== 'pending') {
+      promiseCache.delete(cacheKey);
     }
-    let pc = promiseCache.get(api);
-    if (!pc) {
-      pc = new WeakMap();
-      promiseCache.set(api, pc);
-    }
-    let prom = pc.get(args);
+  }
+
+  function useNamedPromise<R>(
+    currCacheKey: string,
+    fn: (api: RpcStub<T>) => Promise<R>,
+  ): R {
+    const api = useCapnWebApi() as any;
+    let prom = promiseCache.get(currCacheKey)?.promise;
     if (!prom) {
-      prom = Promise.resolve(api[apiName](...args));
-      prom.finally(() => {
-        pc.delete(args);
-      })
-      pc.set(args, prom);
+      prom = Promise.resolve(fn(api));
+      const promiseStatus: PromiseTracker = {
+        status: 'pending',
+        promise: prom,
+      };
+      prom.then(() => {
+        promiseStatus.status = 'resolved';
+      });
+      prom.catch(() => {
+        promiseStatus.status = 'rejected';
+      });
+      promiseCache.set(currCacheKey, promiseStatus);
     }
+    useEffect(() => {
+      cleanCache(currCacheKey);
+      return () => cleanCache(currCacheKey, true);
+    }, [currCacheKey]);
     return use(prom);
+  }
+
+  function useCapnWeb2<K extends keyof T>(
+    apiName: K,
+    ...args: T[K] extends (...args: infer P) => any ? P : never
+  ): T[K] extends (...args: any[]) => Promise<infer R> ? R : never {
+    // Create a stable cache key from apiName and args
+    const currCacheKey = JSON.stringify([apiName, ...args]);
+    return useNamedPromise(currCacheKey, (api: any) => api[apiName](...args));
+  }
+
+  function useCapnWeb3<R>(
+    operationName: string,
+    fn: (api: RpcStub<T>) => Promise<R>,
+    ...deps: any[]
+  ): R {
+    // Create a stable cache key from operationName and args, the ! makes sure we don't collide with
+    // names in useCapnWeb2 which have to be properties on the api object
+    const currCacheKey = JSON.stringify(['!' + operationName, ...deps]);
+    const result = useNamedPromise(
+      currCacheKey,
+      fn as any,
+    ) as R;
+    return result;
   }
 
   function useCapnWebApi(): RpcStub<T> {
@@ -159,6 +204,8 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
 
   return {
     useCapnWeb,
+    useCapnWeb2,
+    useCapnWeb3,
     useCapnWebApi,
   } as Omit<CapnWebHooks<T>, 'CapnWebProvider' | 'close'>;
 }
