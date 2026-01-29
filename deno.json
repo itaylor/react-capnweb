@@ -41,7 +41,7 @@
     "fmt": "deno fmt",
     "check": "deno check && deno task lint && deno task fmt --check",
     "build:npm": "deno run -A scripts/build_npm.ts",
-    "bundle:fixtures": "deno bundle --sourcemap=inline --outdir=test-fixtures/dist test-fixtures/*.tsx"
+    "bundle:fixtures": "deno bundle --sourcemap=inline --outdir=test-fixtures/dist test-fixtures/*.ts*"
   },
   "lint": {
     "rules": {

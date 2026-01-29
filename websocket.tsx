@@ -1,9 +1,9 @@
 // deno-lint-ignore verbatim-module-syntax
 import * as React from 'react';
-import { createContext, useEffect, useState } from 'react';
-import type { RpcCompatible, RpcSessionOptions } from 'capnweb';
+import { createContext, useContext, useEffect, useState } from 'react';
+import type { RpcCompatible, RpcSessionOptions, RpcStub } from 'capnweb';
 import { newWebSocketRpcSession } from 'capnweb';
-import { createHooksForContext } from './core.tsx';
+import { createHooks } from './core.tsx';
 import type { CapnWebHooks } from './core.tsx';
 
 /**
@@ -424,7 +424,24 @@ export function initCapnWebSocket<T extends RpcCompatible<T>>(
     );
   }
 
-  const hooks = createHooksForContext<T>(apiContext);
+  function useCapnWebStubWithClosedCheck(): RpcStub<T> {
+    if (isClosed) {
+      throw new Error(
+        'Cannot make RPC calls after the session has been closed',
+      );
+    }
+
+    const api = useContext(apiContext);
+    if (!api) {
+      throw new Error('useCapnWebStub must be used within a CapnWebProvider');
+    }
+
+    return api as RpcStub<T>;
+  }
+
+  const hooks = createHooks<T>(
+    useCapnWebStubWithClosedCheck,
+  );
 
   return {
     ...hooks,

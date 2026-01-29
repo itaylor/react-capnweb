@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
-// deno-lint-ignore no-unused-vars verbatim-module-syntax
-import React, { Suspense, useEffect, useState } from 'react';
+// deno-lint-ignore verbatim-module-syntax
+import React, { Component, Suspense, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { initCapnWebSocket } from '../websocket.tsx';
 
@@ -36,6 +36,37 @@ const {
     console.log('[Callback] All retries exhausted');
   },
 });
+
+// Error Boundary to catch errors from disposed sessions
+class ErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  override componentDidCatch(error: Error, errorInfo: any) {
+    console.log('ErrorBoundary caught error:', error, errorInfo);
+  }
+
+  override render() {
+    if (this.state.hasError) {
+      return (
+        <div className='test-result test-error'>
+          Error: {this.state.error?.message || 'Unknown error'}
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 function ConnectionStatus() {
   const state = useConnectionState();
@@ -412,13 +443,21 @@ function App() {
     <CapnWebProvider>
       <div data-testid='websocket-demo'>
         <ConnectionStatus />
-        <ApiTests />
-        <Suspense fallback={<div>Loading...</div>}>
-          <UseCapnWebTests />
-        </Suspense>
-        <Suspense fallback={<div>Loading...</div>}>
-          <UseCapnWebQueryTests />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<div>Loading...</div>}>
+            <ApiTests />
+          </Suspense>
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<div>Loading...</div>}>
+            <UseCapnWebTests />
+          </Suspense>
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<div>Loading...</div>}>
+            <UseCapnWebQueryTests />
+          </Suspense>
+        </ErrorBoundary>
         <SuspenseTest />
         <ManualConnectionControl />
         <CallbackLogger />

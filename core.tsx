@@ -71,9 +71,8 @@ export interface CapnWebHooks<T extends RpcCompatible<T>> {
  * @returns Hook functions (useCapnWeb and useCapnWebApi)
  */
 
-export function createHooksForContext<T extends RpcCompatible<T>>(
-  apiContext: React.Context<any>,
-  customUseCapnWebStub?: () => RpcStub<T>,
+export function createHooks<T extends RpcCompatible<T>>(
+  useCapnWebStub: () => RpcStub<T>,
 ): Omit<CapnWebHooks<T>, 'CapnWebProvider' | 'close'> {
   type PromiseTracker = {
     status: 'pending' | 'resolved' | 'rejected';
@@ -111,27 +110,43 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
     currCacheKey: string,
     fn: (api: RpcStub<T>) => Promise<R>,
   ): R {
-    const api = useCapnWebStub() as any;
-    let prom = promiseCache.get(currCacheKey)?.promise;
-    if (!prom) {
-      prom = Promise.resolve(fn(api));
-      const promiseStatus: PromiseTracker = {
-        status: 'pending',
-        promise: prom,
-        timestamp: Date.now(),
-      };
-      prom.then(() => {
-        promiseStatus.status = 'resolved';
-      });
-      prom.catch(() => {
-        promiseStatus.status = 'rejected';
-      });
-      promiseCache.set(currCacheKey, promiseStatus);
+    let prom: Promise<any> | undefined;
+    try {
+      const api = useCapnWebStub() as any;
+      prom = promiseCache.get(currCacheKey)?.promise;
+      if (!prom) {
+        prom = Promise.resolve(fn(api));
+        const promiseStatus: PromiseTracker = {
+          status: 'pending',
+          promise: prom,
+          timestamp: Date.now(),
+        };
+        prom.then(() => {
+          promiseStatus.status = 'resolved';
+        });
+        prom.catch(() => {
+          promiseStatus.status = 'rejected';
+        });
+        promiseCache.set(currCacheKey, promiseStatus);
+      }
+      useEffect(() => {
+        cleanCache(currCacheKey);
+        return () => cleanCache(currCacheKey, true);
+      }, [currCacheKey]);
+    } catch (error) {
+      const errorKey = JSON.stringify(error);
+      const cachedError = promiseCache.get(errorKey);
+      if (cachedError) {
+        prom = cachedError.promise;
+      } else {
+        prom = Promise.reject(error);
+        promiseCache.set(errorKey, {
+          status: 'rejected',
+          promise: prom,
+          timestamp: Date.now(),
+        });
+      }
     }
-    useEffect(() => {
-      cleanCache(currCacheKey);
-      return () => cleanCache(currCacheKey, true);
-    }, [currCacheKey]);
     return use(prom);
   }
 
@@ -159,53 +174,11 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
     return result;
   }
 
-  function useCapnWebStub(): RpcStub<T> {
-    if (customUseCapnWebStub) {
-      return customUseCapnWebStub();
-    }
-
-    const api = useContext(apiContext);
-    if (!api) {
-      throw new Error('useCapnWebStub must be used within a CapnWebProvider');
-    }
-
-    return api as RpcStub<T>;
-  }
-
   return {
     useCapnWeb,
     useCapnWebQuery,
     useCapnWebStub,
   } as Omit<CapnWebHooks<T>, 'CapnWebProvider' | 'close'>;
-}
-
-/**
- * Creates the standard set of React hooks for a capnweb transport.
- * This is used internally by transport-specific initialization functions
- * that don't need custom provider logic.
- *
- * @param sessionFactory - Function that creates and returns the RPC session/stub
- * @returns The standard CapnWebHooks interface
- */
-export function createCapnWebHooks<T extends RpcCompatible<T>>(
-  sessionFactory: () => any,
-): CapnWebHooks<T> {
-  const apiContext = createContext<any | null>(null);
-
-  function CapnWebProvider({ children }: { children: React.ReactNode }) {
-    const [session] = useState<any>(sessionFactory);
-
-    return <apiContext.Provider value={session}>{children}
-    </apiContext.Provider>;
-  }
-
-  const hooks = createHooksForContext<T>(apiContext);
-
-  return {
-    ...hooks,
-    CapnWebProvider,
-    close: () => {}, // No-op close for backward compatibility
-  };
 }
 
 /**
@@ -302,7 +275,24 @@ export function createCapnWebHooksWithLifecycle<T extends RpcCompatible<T>>(
     );
   }
 
-  const hooks = createHooksForContext<T>(apiContext);
+  // Custom useCapnWebStub that checks if the session is closed
+  function useCapnWebStubWithClosedCheck(): RpcStub<T> {
+    if (isClosed) {
+      throw new Error(
+        'Cannot make RPC calls after the session has been closed',
+      );
+    }
+    const api = useContext(apiContext);
+    if (!api) {
+      throw new Error('useCapnWebStub must be used within a CapnWebProvider');
+    }
+
+    return api as RpcStub<T>;
+  }
+
+  const hooks = createHooks<T>(
+    useCapnWebStubWithClosedCheck,
+  );
 
   return {
     ...hooks,

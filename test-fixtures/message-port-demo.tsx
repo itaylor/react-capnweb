@@ -1,9 +1,8 @@
 /// <reference lib="dom" />
-// deno-lint-ignore no-unused-vars verbatim-module-syntax
-import React, { useEffect, useState } from 'react';
+import React, { Component, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { initCapnMessagePort } from '../message-port.tsx';
-import { newMessagePortRpcSession, RpcTarget } from 'capnweb';
+import type { RpcTarget } from 'capnweb';
 
 // Mock API interface for testing
 interface TestApi extends RpcTarget {
@@ -11,87 +10,133 @@ interface TestApi extends RpcTarget {
   add(a: number, b: number): number;
 }
 
-// Server implementation for the worker side
-class TestApiImpl extends RpcTarget {
-  echo(message: string): string {
-    return message;
-  }
+// Create worker and MessageChannel
+let worker: Worker | null = null;
+let channel: MessageChannel | null = null;
+let capnWebHooks: ReturnType<typeof initCapnMessagePort<TestApi>> | null = null;
 
-  add(a: number, b: number): number {
-    return a + b;
-  }
+function initializeWorker(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    try {
+      // Create the worker
+      worker = new Worker(
+        new URL('./message-port-worker.js', import.meta.url),
+        { type: 'module' },
+      );
+
+      // Create MessageChannel
+      channel = new MessageChannel();
+
+      // Initialize CapnWeb with port1
+      capnWebHooks = initCapnMessagePort<TestApi>(channel.port1, {
+        onDisconnect: () => {
+          console.log('[MessagePort] Disconnected');
+        },
+      });
+
+      // Listen for worker ready message
+      const messageHandler = (event: MessageEvent) => {
+        if (event.data.type === 'ready') {
+          console.log('[Main] Worker is ready');
+          worker?.removeEventListener('message', messageHandler);
+          resolve();
+        } else if (event.data.type === 'error') {
+          console.error('[Main] Worker error:', event.data.error);
+          worker?.removeEventListener('message', messageHandler);
+          reject(new Error(event.data.error));
+        }
+      };
+
+      worker.addEventListener('message', messageHandler);
+
+      // Send port2 to the worker
+      worker.postMessage({ type: 'init', port: channel.port2 }, [
+        channel.port2,
+      ]);
+
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        worker?.removeEventListener('message', messageHandler);
+        reject(new Error('Worker initialization timeout'));
+      }, 5000);
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 
-// Create a MessageChannel for testing
-const channel = new MessageChannel();
+// Error Boundary to catch errors from disposed sessions
+class ErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
 
-// Initialize MessagePort connection with port1
-const {
-  CapnWebProvider,
-  useCapnWeb,
-  useCapnWebStub,
-  close,
-} = initCapnMessagePort<TestApi>(channel.port1, {
-  onDisconnect: () => {
-    console.log('[MessagePort] Disconnected');
-  },
-});
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
 
-// Simulate a "worker" on port2 using capnweb RPC
-function setupSimulatedWorker() {
-  const port2 = channel.port2;
+  override componentDidCatch(error: Error, errorInfo: any) {
+    console.log('ErrorBoundary caught error:', error, errorInfo);
+  }
 
-  try {
-    // Create a capnweb RPC session on the worker side
-    newMessagePortRpcSession(port2, new TestApiImpl());
-    console.log('[Simulated Worker] Capnweb RPC session initialized');
-  } catch (error) {
-    console.error('[Simulated Worker] Failed to initialize:', error);
+  override render() {
+    if (this.state.hasError) {
+      return (
+        <div className='test-result test-error'>
+          Error: {this.state.error?.message || 'Unknown error'}
+        </div>
+      );
+    }
+
+    return this.props.children;
   }
 }
 
 function PortStatus() {
-  const [status, setStatus] = useState<'ready' | 'closed'>('ready');
+  const [status, setStatus] = useState<'initializing' | 'ready' | 'closed'>(
+    'initializing',
+  );
 
   useEffect(() => {
-    // Note: MessagePort close detection has limited browser support
-    const checkStatus = () => {
-      try {
-        // Port is ready if we can still post messages
-        channel.port1.postMessage('test');
-        setStatus('ready');
-      } catch {
-        setStatus('closed');
-      }
-    };
-
-    const interval = setInterval(checkStatus, 1000);
-    return () => clearInterval(interval);
+    if (capnWebHooks) {
+      setStatus('ready');
+    }
   }, []);
 
   return (
     <div className='test-section'>
       <h2>MessagePort Status</h2>
       <div className='info-box'>
-        ℹ️ MessagePort provides efficient communication between contexts (e.g.,
-        main thread and Web Workers). This demo uses a simulated worker for
-        testing.
+        ℹ️ MessagePort provides efficient communication between contexts (main
+        thread and Web Workers). This demo uses a real Web Worker.
       </div>
       <div
         className={`test-result ${
-          status === 'ready' ? 'test-success' : 'test-error'
+          status === 'ready'
+            ? 'test-success'
+            : status === 'initializing'
+            ? ''
+            : 'test-error'
         }`}
         data-testid='port-status'
         data-status={status}
       >
-        {status === 'ready' ? '✓ Port Ready' : '✗ Port Closed'}
+        {status === 'initializing'
+          ? '⏳ Initializing Worker...'
+          : status === 'ready'
+          ? '✓ Worker Ready'
+          : '✗ Port Closed'}
       </div>
     </div>
   );
 }
 
 function ApiTests() {
-  const api = useCapnWebStub();
+  const api = capnWebHooks!.useCapnWebStub();
   const [testResults, setTestResults] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -189,7 +234,7 @@ function ApiTests() {
 function UseCapnWebTests() {
   // Simple demonstration of useCapnWeb's API.
   const [count, setCount] = useState(1);
-  const result = useCapnWeb('add', 5, count);
+  const result = capnWebHooks!.useCapnWeb('add', 5, count);
 
   return (
     <div className='test-section'>
@@ -238,7 +283,7 @@ function ManualPortControl() {
   const [closed, setClosed] = useState(false);
 
   const handleClose = () => {
-    close();
+    capnWebHooks!.close();
     setClosed(true);
   };
 
@@ -271,7 +316,7 @@ function ManualPortControl() {
 }
 
 function DirectApiUsage() {
-  const api = useCapnWebStub();
+  const api = capnWebHooks!.useCapnWebStub();
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
@@ -330,30 +375,76 @@ function MessagePortInfo() {
         </ul>
       </div>
       <div className='info-box' style={{ marginTop: '12px' }}>
-        ℹ️ Note: This demo uses a simulated worker (MessageChannel with both
-        ports in same context). In real usage, you'd send one port to a Worker
-        or iframe.
+        ℹ️ This demo uses a real Web Worker for authentic cross-context
+        communication.
       </div>
     </div>
   );
 }
 
 function App() {
+  const [initialized, setInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    // Setup the simulated worker
-    setupSimulatedWorker();
+    initializeWorker()
+      .then(() => {
+        setInitialized(true);
+      })
+      .catch((err) => {
+        console.error('Failed to initialize worker:', err);
+        setError(err.message);
+      });
+
+    return () => {
+      // Cleanup worker on unmount
+      if (worker) {
+        worker.terminate();
+      }
+    };
   }, []);
+
+  if (error) {
+    return (
+      <div data-testid='message-port-demo'>
+        <div className='test-result test-error'>
+          Failed to initialize worker: {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (!initialized || !capnWebHooks) {
+    return (
+      <div data-testid='message-port-demo'>
+        <div>Initializing worker...</div>
+      </div>
+    );
+  }
+
+  const { CapnWebProvider } = capnWebHooks;
 
   return (
     <CapnWebProvider>
       <div data-testid='message-port-demo'>
         <PortStatus />
         <MessagePortInfo />
-        <ApiTests />
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <UseCapnWebTests />
-        </React.Suspense>
-        <DirectApiUsage />
+        <ErrorBoundary>
+          <React.Suspense fallback={<div>Loading...</div>}>
+            <ApiTests />
+          </React.Suspense>
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <React.Suspense fallback={<div>Loading...</div>}>
+            <UseCapnWebTests />
+          </React.Suspense>
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <React.Suspense fallback={<div>Loading...</div>}>
+            <ApiTests />
+          </React.Suspense>
+          <DirectApiUsage />
+        </ErrorBoundary>
         <ManualPortControl />
       </div>
     </CapnWebProvider>

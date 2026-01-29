@@ -1,6 +1,5 @@
 /// <reference lib="dom" />
-// deno-lint-ignore no-unused-vars verbatim-module-syntax
-import React, { useState } from 'react';
+import React, { Component, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { initCapnHttpBatch } from '../http-batch.tsx';
 
@@ -27,6 +26,37 @@ const {
     console.error('[HTTP Batch Error]:', error);
   },
 });
+
+// Error Boundary to catch errors from disposed sessions
+class ErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  override componentDidCatch(error: Error, errorInfo: any) {
+    console.log('ErrorBoundary caught error:', error, errorInfo);
+  }
+
+  override render() {
+    if (this.state.hasError) {
+      return (
+        <div className='test-result test-error'>
+          Error: {this.state.error?.message || 'Unknown error'}
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 function ApiTests() {
   const [testResults, setTestResults] = useState<string[]>([]);
@@ -371,12 +401,16 @@ function App() {
     <CapnWebProvider>
       <div data-testid='http-batch-demo'>
         <ApiTests />
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <UseCapnWebTests />
-        </React.Suspense>
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <UseCapnWebQueryTests />
-        </React.Suspense>
+        <ErrorBoundary>
+          <React.Suspense fallback={<div>Loading...</div>}>
+            <UseCapnWebTests />
+          </React.Suspense>
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <React.Suspense fallback={<div>Loading...</div>}>
+            <UseCapnWebQueryTests />
+          </React.Suspense>
+        </ErrorBoundary>
         <DirectApiUsage />
         <ManualSessionControl />
         <ErrorHandling />

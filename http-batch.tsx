@@ -1,8 +1,7 @@
 import type { RpcCompatible, RpcSessionOptions, RpcStub } from 'capnweb';
 import { newHttpBatchRpcSession } from 'capnweb';
 import type { CapnWebHooks } from './core.tsx';
-import { createHooksForContext } from './core.tsx';
-import { createContext } from 'react';
+import { createHooks } from './core.tsx';
 /**
  * Options for configuring HTTP Batch RPC behavior.
  */
@@ -165,9 +164,6 @@ export function initCapnHttpBatch<T extends RpcCompatible<T>>(
     referrerPolicy: options.referrerPolicy,
   });
 
-  // Create a dummy context (not used, but required by createHooksForContext)
-  const apiContext = createContext<any | null>(null);
-
   // Custom useCapnWebStub that creates a new HTTP batch session each time
   function useCapnWebStub(): RpcStub<T> {
     const session = newHttpBatchRpcSession<T>(
@@ -178,7 +174,7 @@ export function initCapnHttpBatch<T extends RpcCompatible<T>>(
   }
 
   // Use the core hooks with our custom stub implementation
-  const hooks = createHooksForContext<T>(apiContext, useCapnWebStub);
+  const hooks = createHooks<T>(useCapnWebStub);
 
   function CapnWebProvider({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
