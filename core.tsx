@@ -132,15 +132,34 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
   type PromiseTracker = {
     status: 'pending' | 'resolved' | 'rejected';
     promise: Promise<any>;
+    timestamp: number;
   };
 
   const promiseCache = new Map<string, PromiseTracker>();
+  const STALE_PROMISE_MS = 60000; // Clean up settled promises after 1 minute
+  const CLEANUP_INTERVAL_MS = 10000; // Run cleanup every 10 seconds
+
   function cleanCache(cacheKey: string, deletePending: boolean = false) {
     const val = promiseCache.get(cacheKey);
     if (deletePending || val?.status !== 'pending') {
       promiseCache.delete(cacheKey);
     }
   }
+
+  function cleanStalePromises() {
+    const now = Date.now();
+    for (const [key, tracker] of promiseCache.entries()) {
+      if (
+        tracker.status !== 'pending' &&
+        now - tracker.timestamp > STALE_PROMISE_MS
+      ) {
+        promiseCache.delete(key);
+      }
+    }
+  }
+
+  // Start cleanup interval
+  const cleanupInterval = setInterval(cleanStalePromises, CLEANUP_INTERVAL_MS);
 
   function useNamedPromise<R>(
     currCacheKey: string,
@@ -153,6 +172,7 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
       const promiseStatus: PromiseTracker = {
         status: 'pending',
         promise: prom,
+        timestamp: Date.now(),
       };
       prom.then(() => {
         promiseStatus.status = 'resolved';
