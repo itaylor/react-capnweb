@@ -380,11 +380,45 @@ Deno.test('WebSocket - useCapnWeb demo renders', async () => {
 
     console.log('WebSocket useCapnWeb demo results:', resultsText);
 
+    // Should contain success message
+    assertStringIncludes(
+      resultsText,
+      'Success',
+      'useCapnWeb demo should show success',
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
+Deno.test('WebSocket - useCapnWebQuery demo renders', async () => {
+  const browser = await launch({ headless: true });
+
+  try {
+    const page = await browser.newPage(
+      `http://${WEBSOCKET_IP}:${DEFAULT_PORT}`,
+    );
+    setupErrorReporting(page);
+
+    await waitForElement(page, '[data-testid="websocket-demo"]');
+
+    // Wait for useCapnWebQuery demo to render with Suspense
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Should show test results
+    const results = await waitForElement(
+      page,
+      '[data-testid="usecapnwebquery-test-results"]',
+    );
+    const resultsText = await results.innerText();
+
+    console.log('WebSocket useCapnWebQuery demo results:', resultsText);
+
     // Should contain completion message
     assertStringIncludes(
       resultsText,
       'completed',
-      'useCapnWeb demo should show results',
+      'useCapnWebQuery demo should show results',
     );
   } finally {
     await browser.close();
@@ -477,11 +511,45 @@ Deno.test('HTTP Batch - useCapnWeb demo renders', async () => {
 
     console.log('HTTP Batch useCapnWeb demo results:', resultsText);
 
+    // Should contain success message
+    assertStringIncludes(
+      resultsText,
+      'Success',
+      'useCapnWeb demo should show success',
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
+Deno.test('HTTP Batch - useCapnWebQuery demo renders', async () => {
+  const browser = await launch({ headless: true });
+
+  try {
+    const page = await browser.newPage(
+      `http://${HTTP_BATCH_IP}:${DEFAULT_PORT}`,
+    );
+    setupErrorReporting(page);
+
+    await waitForElement(page, '[data-testid="http-batch-demo"]');
+
+    // Wait for useCapnWebQuery demo to render with Suspense
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Should show test results
+    const results = await waitForElement(
+      page,
+      '[data-testid="usecapnwebquery-test-results"]',
+    );
+    const resultsText = await results.innerText();
+
+    console.log('HTTP Batch useCapnWebQuery demo results:', resultsText);
+
     // Should contain completion message
     assertStringIncludes(
       resultsText,
       'completed',
-      'useCapnWeb demo should show results',
+      'useCapnWebQuery demo should show results',
     );
   } finally {
     await browser.close();
@@ -688,7 +756,41 @@ Deno.test('MessagePort - RPC API tests can be executed', async () => {
   }
 });
 
-Deno.test('MessagePort - Direct API call works', async () => {
+Deno.test('MessagePort - useCapnWeb demo renders', async () => {
+  const browser = await launch({ headless: true });
+
+  try {
+    const page = await browser.newPage(
+      `http://${MESSAGE_PORT_IP}:${DEFAULT_PORT}`,
+    );
+    setupErrorReporting(page);
+
+    await waitForElement(page, '[data-testid="message-port-demo"]');
+
+    // Wait for useCapnWeb demo to render with Suspense
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Should show test results
+    const results = await waitForElement(
+      page,
+      '[data-testid="usecapnweb-test-results"]',
+    );
+    const resultsText = await results.innerText();
+
+    console.log('MessagePort useCapnWeb demo results:', resultsText);
+
+    // Should contain success message
+    assertStringIncludes(
+      resultsText,
+      'Success',
+      'useCapnWeb demo should show success',
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
+Deno.test('MessagePort - direct API call works', async () => {
   const browser = await launch({ headless: true });
 
   try {
@@ -707,22 +809,20 @@ Deno.test('MessagePort - Direct API call works', async () => {
     await directCallBtn.click();
 
     // Wait for result
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Should show result
     const result = await waitForElement(
       page,
       '[data-testid="direct-call-result"]',
     );
     const resultText = await result.innerText();
 
-    console.log('Direct call result:', resultText);
+    console.log('MessagePort direct call result:', resultText);
 
-    // Result should indicate success or error
-    assertEquals(
-      resultText.includes('Success') || resultText.includes('Error'),
-      true,
-      'Should show a result',
+    assertStringIncludes(
+      resultText,
+      'Success',
+      'Direct API call should succeed',
     );
   } finally {
     await browser.close();

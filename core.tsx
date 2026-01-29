@@ -20,36 +20,40 @@ export interface CapnWebHooks<T extends RpcCompatible<T>> {
   }) => React.ReactElement;
 
   /**
-   * Hook for making RPC calls with React Suspense support.
+   * Hook for making simple RPC calls with React Suspense support.
    * Suspends until the promise resolves, making it work seamlessly with Suspense boundaries.
    *
-   * @param fn - Function that takes the API and returns a Promise
-   * @param deps - Dependency array (like useEffect)
+   * @param apiName - Name of the API method to call
+   * @param args - Arguments to pass to the API method
    * @returns The resolved value from the RPC call
    */
-  useCapnWeb: <TResult>(
-    fn: (api: RpcStub<T>) => Promise<TResult>,
-    deps?: any[],
-  ) => TResult | undefined;
-
-  useCapnWeb2<K extends keyof T>(
+  useCapnWeb<K extends keyof T>(
     apiName: K,
     ...args: T[K] extends (...args: infer P) => any ? P : never
   ): T[K] extends (...args: any[]) => Promise<infer R> ? R : never;
 
-  useCapnWeb3<R>(
+  /**
+   * Hook for complex RPC queries with React Suspense support.
+   * Allows custom logic, multiple API calls, and promise pipelining.
+   *
+   * @param operationName - Unique name for this operation (used for caching)
+   * @param fn - Function that takes the API and returns a Promise
+   * @param deps - Dependencies that affect the query
+   * @returns The resolved value from the RPC call
+   */
+  useCapnWebQuery<R>(
     operationName: string,
     fn: (api: RpcStub<T>) => Promise<R>,
     ...deps: any[]
   ): R;
 
   /**
-   * Hook for direct access to the RPC API.
+   * Hook for direct access to the RPC API stub.
    * Use this for more control over when and how RPC calls are made.
    *
    * @returns The RPC API stub
    */
-  useCapnWebApi: () => RpcStub<T>;
+  useCapnWebStub: () => RpcStub<T>;
 
   /**
    * Manually close the connection and dispose the session.
@@ -69,66 +73,8 @@ export interface CapnWebHooks<T extends RpcCompatible<T>> {
 
 export function createHooksForContext<T extends RpcCompatible<T>>(
   apiContext: React.Context<any>,
+  customUseCapnWebStub?: () => RpcStub<T>,
 ): Omit<CapnWebHooks<T>, 'CapnWebProvider' | 'close'> {
-  /**
-   * Hook for making RPC calls with React Suspense support.
-   *
-   * The function will suspend while the RPC call is in progress, making it work
-   * seamlessly with Suspense boundaries.
-   *
-   * @param fn - Function that takes the API and returns a Promise
-   * @param deps - Dependency array (like useEffect)
-   * @returns The resolved value from the RPC call, or undefined on first render
-   *
-   * **Important Notes:**
-   *
-   * - **Suspense**: The component suspends immediately on first render while the RPC call
-   *   is in progress. Make sure to wrap in a Suspense boundary to show a loading state.
-   *
-   * - **Concurrent calls**: If dependencies change while a call is in progress, the old call
-   *   continues to run but a new call is initiated. The old call's result will be ignored.
-   *   This is generally fine for multiplexed transports (WebSocket, MessagePort) and stateless
-   *   HTTP requests, but be aware that network resources are used.
-   *
-   * - **Error handling**: Use an Error Boundary to catch errors from failed RPC calls.
-   *
-   * @example
-   * ```tsx
-   * function UserProfile({ userId }) {
-   *   const user = useCapnWeb(
-   *     (api) => api.getUser(userId),
-   *     [userId]
-   *   );
-   *
-   *   return <div>{user?.name}</div>;
-   * }
-   *
-   * // Wrap with Suspense and Error Boundary
-   * function App() {
-   *   return (
-   *     <ErrorBoundary fallback={<Error />}>
-   *       <Suspense fallback={<Loading />}>
-   *         <UserProfile userId="123" />
-   *       </Suspense>
-   *     </ErrorBoundary>
-   *   );
-   * }
-   * ```
-   */
-  function useCapnWeb<TResult>(
-    fn: (api: RpcStub<T>) => Promise<TResult>,
-    deps: any[] = [],
-  ): TResult | undefined {
-    const api = useCapnWebApi() as any;
-    const [prom, setProm] = useState<Promise<TResult> | null>(null);
-    useEffect(() => {
-      setProm(Promise.resolve(fn(api)));
-    }, [api, ...deps]);
-    if (prom) {
-      return use(prom);
-    }
-  }
-
   type PromiseTracker = {
     status: 'pending' | 'resolved' | 'rejected';
     promise: Promise<any>;
@@ -159,13 +105,13 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
   }
 
   // Start cleanup interval
-  const cleanupInterval = setInterval(cleanStalePromises, CLEANUP_INTERVAL_MS);
+  const _cleanupInterval = setInterval(cleanStalePromises, CLEANUP_INTERVAL_MS);
 
   function useNamedPromise<R>(
     currCacheKey: string,
     fn: (api: RpcStub<T>) => Promise<R>,
   ): R {
-    const api = useCapnWebApi() as any;
+    const api = useCapnWebStub() as any;
     let prom = promiseCache.get(currCacheKey)?.promise;
     if (!prom) {
       prom = Promise.resolve(fn(api));
@@ -189,7 +135,7 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
     return use(prom);
   }
 
-  function useCapnWeb2<K extends keyof T>(
+  function useCapnWeb<K extends keyof T>(
     apiName: K,
     ...args: T[K] extends (...args: infer P) => any ? P : never
   ): T[K] extends (...args: any[]) => Promise<infer R> ? R : never {
@@ -198,13 +144,13 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
     return useNamedPromise(currCacheKey, (api: any) => api[apiName](...args));
   }
 
-  function useCapnWeb3<R>(
+  function useCapnWebQuery<R>(
     operationName: string,
     fn: (api: RpcStub<T>) => Promise<R>,
     ...deps: any[]
   ): R {
     // Create a stable cache key from operationName and args, the ! makes sure we don't collide with
-    // names in useCapnWeb2 which have to be properties on the api object
+    // names in useCapnWeb which have to be properties on the api object
     const currCacheKey = JSON.stringify(['!' + operationName, ...deps]);
     const result = useNamedPromise(
       currCacheKey,
@@ -213,10 +159,14 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
     return result;
   }
 
-  function useCapnWebApi(): RpcStub<T> {
+  function useCapnWebStub(): RpcStub<T> {
+    if (customUseCapnWebStub) {
+      return customUseCapnWebStub();
+    }
+
     const api = useContext(apiContext);
     if (!api) {
-      throw new Error('useCapnWebApi must be used within a CapnWebProvider');
+      throw new Error('useCapnWebStub must be used within a CapnWebProvider');
     }
 
     return api as RpcStub<T>;
@@ -224,9 +174,8 @@ export function createHooksForContext<T extends RpcCompatible<T>>(
 
   return {
     useCapnWeb,
-    useCapnWeb2,
-    useCapnWeb3,
-    useCapnWebApi,
+    useCapnWebQuery,
+    useCapnWebStub,
   } as Omit<CapnWebHooks<T>, 'CapnWebProvider' | 'close'>;
 }
 

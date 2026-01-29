@@ -1,8 +1,8 @@
 import type { RpcCompatible, RpcSessionOptions, RpcStub } from 'capnweb';
 import { newHttpBatchRpcSession } from 'capnweb';
 import type { CapnWebHooks } from './core.tsx';
-import { use, useEffect } from 'react';
-import React from 'react';
+import { createHooksForContext } from './core.tsx';
+import { createContext } from 'react';
 /**
  * Options for configuring HTTP Batch RPC behavior.
  */
@@ -165,30 +165,11 @@ export function initCapnHttpBatch<T extends RpcCompatible<T>>(
     referrerPolicy: options.referrerPolicy,
   });
 
-  function CapnWebProvider({ children }: { children: React.ReactNode }) {
-    return <>{children}</>;
-  }
+  // Create a dummy context (not used, but required by createHooksForContext)
+  const apiContext = createContext<any | null>(null);
 
-  function useCapnWeb<TResult>(
-    fn: (api: RpcStub<T>) => Promise<TResult>,
-    deps: any[] = [],
-  ): TResult | undefined {
-    // Create promise immediately on first render to avoid returning undefined
-    const [prom, setProm] = React.useState<Promise<TResult> | null>(null);
-    useEffect(() => {
-      const session = useCapnWebApi() as any;
-      const rpcPromise = fn(session);
-      // Wrap RpcPromise in a real Promise so React's use() can handle it
-      setProm(Promise.resolve(rpcPromise));
-    }, deps);
-
-    if (prom) {
-      return use(prom);
-    }
-    return undefined;
-  }
-
-  function useCapnWebApi(): RpcStub<T> {
+  // Custom useCapnWebStub that creates a new HTTP batch session each time
+  function useCapnWebStub(): RpcStub<T> {
     const session = newHttpBatchRpcSession<T>(
       request.clone(),
       options.sessionOptions,
@@ -196,14 +177,20 @@ export function initCapnHttpBatch<T extends RpcCompatible<T>>(
     return session as RpcStub<T>;
   }
 
+  // Use the core hooks with our custom stub implementation
+  const hooks = createHooksForContext<T>(apiContext, useCapnWebStub);
+
+  function CapnWebProvider({ children }: { children: React.ReactNode }) {
+    return <>{children}</>;
+  }
+
   function close() {
     // No-op for HTTP Batch - no persistent connection to close
   }
 
   return {
+    ...hooks,
     CapnWebProvider,
-    useCapnWeb,
-    useCapnWebApi,
     close,
-  } as CapnWebHooks<T>;
+  };
 }

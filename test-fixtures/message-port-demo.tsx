@@ -28,7 +28,8 @@ const channel = new MessageChannel();
 // Initialize MessagePort connection with port1
 const {
   CapnWebProvider,
-  useCapnWebApi,
+  useCapnWeb,
+  useCapnWebStub,
   close,
 } = initCapnMessagePort<TestApi>(channel.port1, {
   onDisconnect: () => {
@@ -90,7 +91,7 @@ function PortStatus() {
 }
 
 function ApiTests() {
-  const api = useCapnWebApi();
+  const api = useCapnWebStub();
   const [testResults, setTestResults] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -185,6 +186,54 @@ function ApiTests() {
   );
 }
 
+function UseCapnWebTests() {
+  // Simple demonstration of useCapnWeb's API.
+  const [count, setCount] = useState(1);
+  const result = useCapnWeb('add', 5, count);
+
+  return (
+    <div className='test-section'>
+      <h2>useCapnWeb Demo</h2>
+      <div className='info-box'>
+        ℹ️ useCapnWeb allows simple method calls with automatic caching and
+        Suspense support
+      </div>
+      <div
+        className='message-list'
+        data-testid='usecapnweb-test-results'
+        style={{ marginTop: '12px' }}
+      >
+        <div className='message-item'>
+          {new Date().toLocaleTimeString()}: 5 + {count} = {result}
+        </div>
+        <div className='message-item'>
+          {result === count + 5 ? '✓ Success!' : '✗ Failed'}
+        </div>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+          <button
+            type='button'
+            className='action-button'
+            onClick={() => {
+              setCount((_count) => _count + 1);
+            }}
+          >
+            Increment
+          </button>
+          <button
+            type='button'
+            className='action-button'
+            onClick={() => {
+              setCount((_count) => _count - 1);
+            }}
+          >
+            Decrement
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ManualPortControl() {
   const [closed, setClosed] = useState(false);
 
@@ -222,7 +271,7 @@ function ManualPortControl() {
 }
 
 function DirectApiUsage() {
-  const api = useCapnWebApi();
+  const api = useCapnWebStub();
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
@@ -242,7 +291,7 @@ function DirectApiUsage() {
 
   return (
     <div className='test-section'>
-      <h2>Direct API Usage (useCapnWebApi)</h2>
+      <h2>Direct API Usage (useCapnWebStub)</h2>
       <button
         type='button'
         className='action-button'
@@ -301,6 +350,9 @@ function App() {
         <PortStatus />
         <MessagePortInfo />
         <ApiTests />
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <UseCapnWebTests />
+        </React.Suspense>
         <DirectApiUsage />
         <ManualPortControl />
       </div>

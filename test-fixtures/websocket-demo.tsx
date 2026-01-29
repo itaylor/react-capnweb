@@ -14,10 +14,9 @@ interface TestApi {
 // Initialize WebSocket connection
 const {
   CapnWebProvider,
-  useCapnWebApi,
+  useCapnWebStub,
   useCapnWeb,
-  useCapnWeb2,
-  useCapnWeb3,
+  useCapnWebQuery,
   useConnectionState,
   close,
 } = initCapnWebSocket<TestApi>('ws://127.0.0.1:8081', {
@@ -133,7 +132,7 @@ function ManualConnectionControl() {
 }
 
 function ApiTests() {
-  const api = useCapnWebApi();
+  const api = useCapnWebStub();
   const [testResults, setTestResults] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -228,31 +227,31 @@ function ApiTests() {
   );
 }
 
-function UseCapnWeb2Tests() {
-  // Simple demonstration of useCapnWeb2's API.
+function UseCapnWebTests() {
+  // Simple demonstration of useCapnWeb's API.
   const [count, setCount] = useState(1);
-  const result = useCapnWeb2('add', 1, count);
-  const result2 = useCapnWeb2('getTimestamp');
+  const result = useCapnWeb('add', 1, count);
+  const result2 = useCapnWeb('getTimestamp');
 
   return (
     <div className='test-section'>
-      <h2>useCapnWeb2 Demo</h2>
+      <h2>useCapnWeb Demo</h2>
       <div className='info-box'>
-        ℹ️ useCapnWeb provides for promise chaining where the computations
-        happen on the server side
+        ℹ️ useCapnWeb allows simple method calls with automatic caching
       </div>
       <div
         className='message-list'
-        data-testid='usecapnweb2-test-results'
+        data-testid='usecapnweb-test-results'
         style={{ marginTop: '12px' }}
       >
         <div className='message-item'>
           {result2}: result = {result}
         </div>
         <div className='message-item'>
-          {result === 3 ? 'Success!' : 'Failed'}
+          {result === count + 1 ? 'Success!' : 'Failed'}
         </div>
         <button
+          type='button'
           onClick={() => {
             setCount((_count) => _count + 1);
           }}
@@ -260,6 +259,7 @@ function UseCapnWeb2Tests() {
           Increment
         </button>
         <button
+          type='button'
           onClick={() => {
             setCount((_count) => _count - 1);
           }}
@@ -271,9 +271,9 @@ function UseCapnWeb2Tests() {
   );
 }
 
-function UseCapnWebTests() {
-  // Simple demonstration of useCapnWeb's promise chaining.
-  const result = useCapnWeb((api) => {
+function UseCapnWebQueryTests() {
+  // Simple demonstration of useCapnWebQuery's promise chaining.
+  const result = useCapnWebQuery('useCapnWebQueryTests', (api) => {
     const p1 = api.add(1, 1);
     const p2 = api.add(p1, 2);
     return api.add(p2, 4);
@@ -283,64 +283,27 @@ function UseCapnWebTests() {
 
   return (
     <div className='test-section'>
-      <h2>useCapnWeb Demo</h2>
+      <h2>useCapnWebQuery Demo</h2>
       <div className='info-box'>
-        ℹ️ useCapnWeb provides for promise chaining where the computations
+        ℹ️ useCapnWebQuery provides for promise chaining where the computations
         happen on the server side
       </div>
       <div
         className='message-list'
-        data-testid='usecapnweb-test-results'
+        data-testid='usecapnwebquery-test-results'
         style={{ marginTop: '12px' }}
       >
         <div className='message-item'>
-          {new Date().toLocaleTimeString()}: Testing useCapnWeb promise chaining
+          {new Date().toLocaleTimeString()}: Testing useCapnWebQuery promise
+          chaining
         </div>
         <div className='message-item'>
           {isValid
-            ? `✓ useCapnWeb promise chaining passed with result  [${result}}]`
-            : `✗ useCapnWeb batched calls failed: [${result}]`}
+            ? `✓ useCapnWebQuery promise chaining passed with result  [${result}}]`
+            : `✗ useCapnWebQuery batched calls failed: [${result}]`}
         </div>
         <div className='message-item'>
-          All useCapnWeb tests completed!
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function UseCapnWeb3Tests() {
-  // Simple demonstration of useCapnWeb's promise chaining.
-  const result = useCapnWeb3('useCapnWeb3Tests', (api) => {
-    const p1 = api.add(1, 1);
-    const p2 = api.add(p1, 2);
-    return api.add(p2, 4);
-  });
-
-  const isValid = result === 8;
-
-  return (
-    <div className='test-section'>
-      <h2>useCapnWeb3 Demo</h2>
-      <div className='info-box'>
-        ℹ️ useCapnWeb3 provides for promise chaining where the computations
-        happen on the server side
-      </div>
-      <div
-        className='message-list'
-        data-testid='usecapnweb-test-results'
-        style={{ marginTop: '12px' }}
-      >
-        <div className='message-item'>
-          {new Date().toLocaleTimeString()}: Testing useCapnWeb promise chaining
-        </div>
-        <div className='message-item'>
-          {isValid
-            ? `✓ useCapnWeb promise chaining passed with result  [${result}}]`
-            : `✗ useCapnWeb batched calls failed: [${result}]`}
-        </div>
-        <div className='message-item'>
-          All useCapnWeb tests completed!
+          All useCapnWebQuery tests completed!
         </div>
       </div>
     </div>
@@ -450,12 +413,11 @@ function App() {
       <div data-testid='websocket-demo'>
         <ConnectionStatus />
         <ApiTests />
-        <UseCapnWebTests />
         <Suspense fallback={<div>Loading...</div>}>
-          <UseCapnWeb2Tests />
+          <UseCapnWebTests />
         </Suspense>
         <Suspense fallback={<div>Loading...</div>}>
-          <UseCapnWeb3Tests />
+          <UseCapnWebQueryTests />
         </Suspense>
         <SuspenseTest />
         <ManualConnectionControl />
