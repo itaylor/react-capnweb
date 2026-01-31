@@ -1,6 +1,6 @@
 // deno-lint-ignore verbatim-module-syntax
 import * as React from 'react';
-import { createContext, use, useContext, useEffect, useState } from 'react';
+import { use, useEffect } from 'react';
 import type { RpcCompatible, RpcStub } from 'capnweb';
 
 // RpcStub from capnweb supports promise pipelining where RpcPromise values can be passed as parameters
@@ -17,7 +17,7 @@ export interface CapnWebHooks<T extends RpcCompatible<T>> {
    */
   CapnWebProvider: (props: {
     children: React.ReactNode;
-  }) => React.ReactElement;
+  }) => React.ReactNode;
 
   /**
    * Hook for making simple RPC calls with React Suspense support.
@@ -130,7 +130,7 @@ export function createHooks<T extends RpcCompatible<T>>(
         promiseCache.set(currCacheKey, promiseStatus);
       }
       useEffect(() => {
-        cleanCache(currCacheKey);
+        // cleanCache(currCacheKey);
         return () => cleanCache(currCacheKey, true);
       }, [currCacheKey]);
     } catch (error) {
@@ -194,11 +194,7 @@ export function createCapnWebHooksWithLifecycle<T extends RpcCompatible<T>>(
   sessionFactory: () => any,
   onClose?: () => void,
 ): CapnWebHooks<T> {
-  const apiContext = createContext<any | null>(null);
-
   // Connection state lives in closure, persists across provider mount/unmount
-  let session: any | null = null;
-  let isClosed = false;
   const listeners = new Set<(session: any) => void>();
 
   function disposeSession(sess: any) {
@@ -212,24 +208,10 @@ export function createCapnWebHooksWithLifecycle<T extends RpcCompatible<T>>(
   }
 
   function notifyListeners() {
-    listeners.forEach((listener) => listener(session));
-  }
-
-  function initSession() {
-    if (isClosed) {
-      throw new Error('Cannot initialize session after it has been closed');
-    }
-
-    return sessionFactory();
+    listeners.forEach((listener) => listener(sessionFactory()));
   }
 
   function close() {
-    if (isClosed) {
-      return; // Already closed
-    }
-
-    isClosed = true;
-
     // Call transport-specific cleanup
     if (onClose) {
       try {
@@ -239,59 +221,18 @@ export function createCapnWebHooksWithLifecycle<T extends RpcCompatible<T>>(
       }
     }
 
-    // Dispose the session (but keep the reference so useCapnWebApi doesn't return null)
+    // Dispose the session (but keep the reference so useCapnWebStub doesn't return null)
     // The disposed session will handle errors naturally when methods are called
-    disposeSession(session);
+    disposeSession(sessionFactory());
     notifyListeners();
   }
 
   function CapnWebProvider({ children }: { children: React.ReactNode }) {
-    const [currentSession, setCurrentSession] = useState<any | null>(
-      () => {
-        // Initialize session on first mount if not already initialized
-        if (!session && !isClosed) {
-          session = initSession();
-        }
-        return session;
-      },
-    );
-
-    useEffect(() => {
-      // Register listener for session updates
-      const listener = (newSession: any) => {
-        setCurrentSession(newSession);
-      };
-      listeners.add(listener);
-
-      return () => {
-        listeners.delete(listener);
-      };
-    }, []);
-
-    return (
-      <apiContext.Provider value={currentSession}>
-        {children}
-      </apiContext.Provider>
-    );
-  }
-
-  // Custom useCapnWebStub that checks if the session is closed
-  function useCapnWebStubWithClosedCheck(): RpcStub<T> {
-    if (isClosed) {
-      throw new Error(
-        'Cannot make RPC calls after the session has been closed',
-      );
-    }
-    const api = useContext(apiContext);
-    if (!api) {
-      throw new Error('useCapnWebStub must be used within a CapnWebProvider');
-    }
-
-    return api as RpcStub<T>;
+    return children;
   }
 
   const hooks = createHooks<T>(
-    useCapnWebStubWithClosedCheck,
+    sessionFactory,
   );
 
   return {

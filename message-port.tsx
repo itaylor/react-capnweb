@@ -106,14 +106,13 @@ export function initCapnMessagePort<T extends RpcCompatible<T>>(
     port.addEventListener('close', options.onDisconnect);
   }
 
-  const sessionFactory = () => {
-    const session: any = newMessagePortRpcSession<T>(
-      port,
-      options.localMain,
-      options.sessionOptions,
-    );
-    return session;
-  };
+  const session: any = newMessagePortRpcSession<T>(
+    port,
+    options.localMain,
+    options.sessionOptions,
+  );
+
+  const sessionFactory = () => session;
 
   const onClose = () => {
     // Close the MessagePort

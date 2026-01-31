@@ -162,6 +162,23 @@ function createWebSocketServer(port: number = WS_PORT): ServerInstance {
     if (req.headers.get('upgrade') === 'websocket') {
       const { socket, response } = Deno.upgradeWebSocket(req);
 
+      socket.onmessage = (event) => {
+        console.log('WebSocket message received:', event.data);
+      };
+      const oldSend = socket.send.bind(socket);
+      socket.send = (data) => {
+        console.log('WebSocket message sent:', data);
+        return oldSend(data);
+      };
+
+      socket.onclose = () => {
+        console.log('WebSocket connection closed');
+      };
+
+      socket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
       socket.onopen = () => {
         console.log('WebSocket connection opened');
         // Initialize capnweb RPC session with our test API
@@ -171,14 +188,6 @@ function createWebSocketServer(port: number = WS_PORT): ServerInstance {
         } catch (error) {
           console.error('Failed to initialize RPC session:', error);
         }
-      };
-
-      socket.onclose = () => {
-        console.log('WebSocket connection closed');
-      };
-
-      socket.onerror = (error) => {
-        console.error('WebSocket error:', error);
       };
 
       return response;

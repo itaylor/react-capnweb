@@ -403,7 +403,7 @@ operations involving multiple API calls, promise pipelining, or custom logic.
 
 **Parameters:**
 
-- `operationName`: Unique name for this operation (used for caching)
+- `operationName`: Unique name for this operation (used for promise caching for compatibility with React Suspense)
 - `fn`: Function that takes the API and returns a Promise
 - `...deps`: Dependencies that affect the query
 
@@ -691,7 +691,7 @@ const user = useCapnWeb((api) => api.getUser('123'), ['123']);
 
 ### React Suspense Support
 
-The `useCapnWeb` hook integrates with React Suspense boundaries:
+The `useCapnWeb` and `useCapnWebQuery` hooks integrate with React Suspense boundaries:
 
 ```typescript
 <Suspense fallback={<Loading />}>

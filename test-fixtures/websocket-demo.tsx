@@ -20,9 +20,6 @@ const {
   useConnectionState,
   close,
 } = initCapnWebSocket<TestApi>('ws://127.0.0.1:8081', {
-  timeout: 2000,
-  retries: 3,
-  backoffStrategy: (retryCount) => retryCount * 500,
   onConnected: () => {
     console.log('[Callback] Connected');
   },
@@ -163,7 +160,6 @@ function ManualConnectionControl() {
 }
 
 function ApiTests() {
-  const api = useCapnWebStub();
   const [testResults, setTestResults] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -174,6 +170,7 @@ function ApiTests() {
   };
 
   const runTests = async () => {
+    const api = useCapnWebStub();
     setIsRunning(true);
     setTestResults([]);
 

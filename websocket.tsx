@@ -1,9 +1,9 @@
 // deno-lint-ignore verbatim-module-syntax
 import * as React from 'react';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { RpcCompatible, RpcSessionOptions, RpcStub } from 'capnweb';
 import { newWebSocketRpcSession } from 'capnweb';
-import { createHooks } from './core.tsx';
+import { createCapnWebHooksWithLifecycle } from './core.tsx';
 import type { CapnWebHooks } from './core.tsx';
 
 /**
@@ -171,22 +171,19 @@ export function initCapnWebSocket<T extends RpcCompatible<T>>(
   options: WebSocketOptions = {},
 ): WebSocketCapnWebHooks<T> {
   const opts = { ...defaultOptions, ...options };
-  const apiContext = createContext<any | null>(null);
 
   // Connection state lives in closure, persists across provider mount/unmount
-  let session: any | null = null;
   let currentWs: WebSocket | null = null;
   let retryCount = 0;
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   let connectionTimeout: ReturnType<typeof setTimeout> | null = null;
   let isReconnecting = false;
-  let isClosed = false; // Track if manually closed
-  const listeners = new Set<(session: any) => void>();
   let connectionState: WebSocketConnectionState = {
     status: 'connecting',
     attempt: 0,
   };
   const stateListeners = new Set<(state: WebSocketConnectionState) => void>();
+  let session = initWebsocket();
 
   function disposeSession(sess: any) {
     if (sess && typeof sess[Symbol.dispose] === 'function') {
@@ -198,25 +195,20 @@ export function initCapnWebSocket<T extends RpcCompatible<T>>(
     }
   }
 
-  function notifyListeners() {
-    listeners.forEach((listener) => listener(session));
-  }
-
   function setConnectionState(newState: WebSocketConnectionState) {
     connectionState = newState;
     stateListeners.forEach((listener) => listener(connectionState));
   }
 
   function handleClose(_event: CloseEvent) {
+    if (connectionState.status === 'closed') {
+      return;
+    }
+
     // Clear connection timeout if it exists
     if (connectionTimeout) {
       clearTimeout(connectionTimeout);
       connectionTimeout = null;
-    }
-
-    // Don't reconnect if manually closed
-    if (isClosed) {
-      return;
     }
 
     // Prevent concurrent reconnection attempts
@@ -257,13 +249,9 @@ export function initCapnWebSocket<T extends RpcCompatible<T>>(
       reconnectTimeout = setTimeout(() => {
         isReconnecting = false;
         reconnectTimeout = null;
-
-        if (!isClosed) {
-          // Dispose old session before creating new one
-          disposeSession(session);
-          session = initWebsocket();
-          notifyListeners();
-        }
+        // Dispose old session before creating new one
+        disposeSession(session);
+        session = initWebsocket();
       }, delay);
     } else {
       console.error(
@@ -337,12 +325,11 @@ export function initCapnWebSocket<T extends RpcCompatible<T>>(
       options.localMain,
       options.sessionOptions,
     );
+    console.log('Created new Websocket Session...');
     return sess;
   }
 
   function close() {
-    isClosed = true;
-
     // Clear any pending reconnection timeout
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout);
@@ -367,8 +354,6 @@ export function initCapnWebSocket<T extends RpcCompatible<T>>(
 
     // Update state
     setConnectionState({ status: 'closed' });
-
-    notifyListeners();
   }
 
   function useConnectionState(): WebSocketConnectionState {
@@ -394,59 +379,14 @@ export function initCapnWebSocket<T extends RpcCompatible<T>>(
     return state;
   }
 
-  function CapnWebProvider({ children }: { children: React.ReactNode }) {
-    const [currentSession, setCurrentSession] = useState<any | null>(
-      () => {
-        // Initialize connection on first mount if not already initialized
-        if (!session && !isClosed) {
-          session = initWebsocket();
-        }
-        return session;
-      },
-    );
-
-    useEffect(() => {
-      // Register listener for session updates
-      const listener = (newSession: any) => {
-        setCurrentSession(newSession);
-      };
-      listeners.add(listener);
-
-      return () => {
-        listeners.delete(listener);
-      };
-    }, []);
-
-    return (
-      <apiContext.Provider value={currentSession}>
-        {children}
-      </apiContext.Provider>
-    );
+  function useCapnWebStub(): RpcStub<T> {
+    return session as any;
   }
 
-  function useCapnWebStubWithClosedCheck(): RpcStub<T> {
-    if (isClosed) {
-      throw new Error(
-        'Cannot make RPC calls after the session has been closed',
-      );
-    }
-
-    const api = useContext(apiContext);
-    if (!api) {
-      throw new Error('useCapnWebStub must be used within a CapnWebProvider');
-    }
-
-    return api as RpcStub<T>;
-  }
-
-  const hooks = createHooks<T>(
-    useCapnWebStubWithClosedCheck,
-  );
+  const hooks = createCapnWebHooksWithLifecycle<T>(useCapnWebStub, close);
 
   return {
     ...hooks,
-    CapnWebProvider,
-    close,
     useConnectionState,
   };
 }
