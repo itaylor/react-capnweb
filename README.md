@@ -43,10 +43,9 @@ npm install @itaylor/react-capnweb
 import { initCapnWebSocket } from '@itaylor/react-capnweb/websocket';
 import type { MyApiInterface } from './my-api-schema';
 
-const { useCapnWeb, useCapnWebQuery, getCapnWebStub } =
-  initCapnWebSocket<
-    MyApiInterface
-  >('ws://localhost:8080/api');
+const { useCapnWeb, useCapnWebQuery, getCapnWebStub } = initCapnWebSocket<
+  MyApiInterface
+>('ws://localhost:8080/api');
 ```
 
 2. **Use the hooks in your components:**
@@ -224,14 +223,15 @@ anywhere, including inside async functions and event handlers.
 ```typescript
 import { initCapnHttpBatch } from '@itaylor/react-capnweb/http-batch';
 
-const { useCapnWeb, useCapnWebQuery, getCapnWebStub } =
-  initCapnHttpBatch<MyApi>(
-    '/api/rpc',
-    {
-      headers: { 'Authorization': 'Bearer token123' },
-      credentials: 'include',
-    },
-  );
+const { useCapnWeb, useCapnWebQuery, getCapnWebStub } = initCapnHttpBatch<
+  MyApi
+>(
+  '/api/rpc',
+  {
+    headers: { 'Authorization': 'Bearer token123' },
+    credentials: 'include',
+  },
+);
 
 function MyComponent() {
   const executeBatch = useCapnWebBatch();
@@ -384,7 +384,8 @@ operations involving multiple API calls, promise pipelining, or custom logic.
 
 **Parameters:**
 
-- `operationName`: Unique name for this operation (used for promise caching for compatibility with React Suspense)
+- `operationName`: Unique name for this operation (used for promise caching for
+  compatibility with React Suspense)
 - `fn`: Function that takes the API and returns a Promise
 - `...deps`: Dependencies that affect the query
 
@@ -672,7 +673,8 @@ const user = useCapnWeb((api) => api.getUser('123'), ['123']);
 
 ### React Suspense Support
 
-The `useCapnWeb` and `useCapnWebQuery` hooks integrate with React Suspense boundaries:
+The `useCapnWeb` and `useCapnWebQuery` hooks integrate with React Suspense
+boundaries:
 
 ```typescript
 <Suspense fallback={<Loading />}>
