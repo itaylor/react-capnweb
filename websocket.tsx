@@ -144,18 +144,14 @@ const defaultOptions: Required<
  * ```tsx
  * import { initCapnWebSocket } from '@itaylor/react-capnweb/websocket';
  *
- * const { CapnWebProvider, useCapnWeb, useCapnWebApi, close } =
+ * const { useCapnWeb, getCapnWebStub, close } =
  *   initCapnWebSocket<MyApi>('ws://localhost:8080/api', {
  *     timeout: 5000,
  *     retries: 10,
  *   });
  *
  * function App() {
- *   return (
- *     <CapnWebProvider>
- *       <MyComponent />
- *     </CapnWebProvider>
- *   );
+ *   return <MyComponent />;
  * }
  *
  * // Later, to close the connection:
@@ -379,11 +375,11 @@ export function initCapnWebSocket<T extends RpcCompatible<T>>(
     return state;
   }
 
-  function useCapnWebStub(): RpcStub<T> {
+  function getCapnWebStub(): RpcStub<T> {
     return session as any;
   }
 
-  const hooks = createCapnWebHooksWithLifecycle<T>(useCapnWebStub, close);
+  const hooks = createCapnWebHooksWithLifecycle<T>(getCapnWebStub, close);
 
   return {
     ...hooks,

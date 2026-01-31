@@ -68,17 +68,13 @@ export interface CustomTransportOptions {
  *   }
  * }
  *
- * const { CapnWebProvider, useCapnWeb, useCapnWebApi, close } =
+ * const { useCapnWeb, getCapnWebStub, close } =
  *   initCapnCustomTransport<MyApi>(new MyCustomTransport(), {
  *     localMain: new MyLocalApi(),
  *   });
  *
  * function App() {
- *   return (
- *     <CapnWebProvider>
- *       <MyComponent />
- *     </CapnWebProvider>
- *   );
+ *   return <MyComponent />;
  * }
  *
  * // Later, to close the connection:
@@ -88,7 +84,7 @@ export interface CustomTransportOptions {
  * @example
  * ```tsx
  * // Using a factory function for lazy initialization
- * const { CapnWebProvider, close } = initCapnCustomTransport<MyApi>(
+ * const { close } = initCapnCustomTransport<MyApi>(
  *   () => new MyCustomTransport(), // Created when first needed
  *   { localMain: new MyLocalApi() }
  * );

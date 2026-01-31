@@ -13,10 +13,9 @@ interface TestApi {
 
 // Initialize HTTP Batch connection
 const {
-  CapnWebProvider,
   useCapnWeb,
   useCapnWebQuery,
-  useCapnWebStub,
+  getCapnWebStub,
 } = initCapnHttpBatch<TestApi>('/api/rpc', {
   headers: {
     'X-Test-Header': 'test-value',
@@ -76,7 +75,7 @@ function ApiTests() {
     try {
       // Test 1: Simple echo
       addResult('Testing echo...');
-      const echoResult = await useCapnWebStub().echo('Hello HTTP Batch');
+      const echoResult = await getCapnWebStub().echo('Hello HTTP Batch');
       if (echoResult === 'Hello HTTP Batch') {
         addResult('✓ Echo test passed');
       } else {
@@ -87,7 +86,7 @@ function ApiTests() {
 
       // Test 2: Get timestamp
       addResult('Testing getTimestamp...');
-      const timestamp = await useCapnWebStub().getTimestamp();
+      const timestamp = await getCapnWebStub().getTimestamp();
       if (typeof timestamp === 'number' && timestamp > 0) {
         addResult(`✓ Timestamp test passed: ${timestamp}`);
       } else {
@@ -96,7 +95,7 @@ function ApiTests() {
 
       // Test 3: Add numbers
       addResult('Testing add...');
-      const sum = await useCapnWebStub().add(10, 5);
+      const sum = await getCapnWebStub().add(10, 5);
       if (sum === 15) {
         addResult('✓ Add test passed: 10 + 5 = 15');
       } else {
@@ -105,7 +104,7 @@ function ApiTests() {
 
       // Test 4: Get user data
       addResult('Testing getUserData...');
-      const userData = await useCapnWebStub().getUserData('test-user-123');
+      const userData = await getCapnWebStub().getUserData('test-user-123');
       if (userData.id === 'test-user-123' && userData.name) {
         addResult(`✓ User data test passed: ${userData.name}`);
       } else {
@@ -114,9 +113,9 @@ function ApiTests() {
 
       // Test 5: Multiple sequential calls (each in separate batch/HTTP request)
       addResult('Testing sequential calls...');
-      const r1 = await useCapnWebStub().add(1, 2);
-      const r2 = await useCapnWebStub().add(3, 4);
-      const r3 = await useCapnWebStub().add(5, 6);
+      const r1 = await getCapnWebStub().add(1, 2);
+      const r2 = await getCapnWebStub().add(3, 4);
+      const r3 = await getCapnWebStub().add(5, 6);
       if (r1 === 3 && r2 === 7 && r3 === 11) {
         addResult('✓ Sequential calls test passed');
       } else {
@@ -124,9 +123,10 @@ function ApiTests() {
       }
 
       // Test 6: Concurrent calls (batching test - all in one HTTP request)
+      // Test 6: Concurrent calls (batching test - all in one HTTP request)
       addResult('Testing concurrent calls (batching)...');
       // Create promises without awaiting to batch them together
-      const api = useCapnWebStub();
+      const api = getCapnWebStub();
       const p1 = api.add(1, 1);
       const p2 = api.add(2, 2);
       const p3 = api.add(3, 3);
@@ -152,7 +152,7 @@ function ApiTests() {
 
   return (
     <div className='test-section'>
-      <h2>RPC API Tests (useCapnWebStub)</h2>
+      <h2>RPC API Tests (getCapnWebStub)</h2>
       <div className='info-box'>
         ℹ️ HTTP Batch transport makes stateless HTTP POST requests. Multiple
         concurrent calls may be automatically batched.
@@ -303,7 +303,7 @@ function ManualSessionControl() {
 }
 
 function DirectApiUsage() {
-  const api = useCapnWebStub();
+  const api = getCapnWebStub();
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
@@ -323,7 +323,7 @@ function DirectApiUsage() {
 
   return (
     <div className='test-section'>
-      <h2>Direct API Usage (useCapnWebStub)</h2>
+      <h2>Direct API Usage (getCapnWebStub)</h2>
       <button
         type='button'
         className='action-button'
@@ -348,7 +348,7 @@ function DirectApiUsage() {
 }
 
 function ErrorHandling() {
-  const api = useCapnWebStub();
+  const api = getCapnWebStub();
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
@@ -398,24 +398,22 @@ function ErrorHandling() {
 
 function App() {
   return (
-    <CapnWebProvider>
-      <div data-testid='http-batch-demo'>
-        <ApiTests />
-        <ErrorBoundary>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            <UseCapnWebTests />
-          </React.Suspense>
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            <UseCapnWebQueryTests />
-          </React.Suspense>
-        </ErrorBoundary>
-        <DirectApiUsage />
-        <ManualSessionControl />
-        <ErrorHandling />
-      </div>
-    </CapnWebProvider>
+    <div data-testid='http-batch-demo'>
+      <ApiTests />
+      <ErrorBoundary>
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <UseCapnWebTests />
+        </React.Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <UseCapnWebQueryTests />
+        </React.Suspense>
+      </ErrorBoundary>
+      <DirectApiUsage />
+      <ManualSessionControl />
+      <ErrorHandling />
+    </div>
   );
 }
 

@@ -136,7 +136,7 @@ function PortStatus() {
 }
 
 function ApiTests() {
-  const api = capnWebHooks!.useCapnWebStub();
+  const api = capnWebHooks!.getCapnWebStub();
   const [testResults, setTestResults] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -316,7 +316,7 @@ function ManualPortControl() {
 }
 
 function DirectApiUsage() {
-  const api = capnWebHooks!.useCapnWebStub();
+  const api = capnWebHooks!.getCapnWebStub();
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
@@ -336,7 +336,7 @@ function DirectApiUsage() {
 
   return (
     <div className='test-section'>
-      <h2>Direct API Usage (useCapnWebStub)</h2>
+      <h2>Direct API Usage (getCapnWebStub)</h2>
       <button
         type='button'
         className='action-button'
@@ -422,32 +422,28 @@ function App() {
     );
   }
 
-  const { CapnWebProvider } = capnWebHooks;
-
   return (
-    <CapnWebProvider>
-      <div data-testid='message-port-demo'>
-        <PortStatus />
-        <MessagePortInfo />
-        <ErrorBoundary>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            <ApiTests />
-          </React.Suspense>
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            <UseCapnWebTests />
-          </React.Suspense>
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            <ApiTests />
-          </React.Suspense>
-          <DirectApiUsage />
-        </ErrorBoundary>
-        <ManualPortControl />
-      </div>
-    </CapnWebProvider>
+    <div data-testid='message-port-demo'>
+      <PortStatus />
+      <MessagePortInfo />
+      <ErrorBoundary>
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <ApiTests />
+        </React.Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <UseCapnWebTests />
+        </React.Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <ApiTests />
+        </React.Suspense>
+        <DirectApiUsage />
+      </ErrorBoundary>
+      <ManualPortControl />
+    </div>
   );
 }
 

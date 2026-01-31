@@ -56,7 +56,7 @@ export interface MessagePortOptions {
  *
  * const channel = new MessageChannel();
  *
- * const { CapnWebProvider, useCapnWebApi, close } =
+ * const { getCapnWebStub, close } =
  *   initCapnMessagePort<WorkerApi>(channel.port1, {
  *     localMain: new ParentApi(), // Worker can call this
  *   });
@@ -65,11 +65,7 @@ export interface MessagePortOptions {
  * worker.postMessage({ port: channel.port2 }, [channel.port2]);
  *
  * function App() {
- *   return (
- *     <CapnWebProvider>
- *       <MyComponent />
- *     </CapnWebProvider>
- *   );
+ *   return <MyComponent />;
  * }
  *
  * // Later, to close the connection:
@@ -84,10 +80,10 @@ export interface MessagePortOptions {
  * // Listen for port from parent
  * window.addEventListener('message', (event) => {
  *   if (event.data.port) {
- *     const { CapnWebProvider, useCapnWebApi } =
+ *     const { getCapnWebStub } =
  *       initCapnMessagePort<ParentApi>(event.data.port);
  *
- *     // Now render your app with the provider
+ *     // Now render your app
  *   }
  * });
  * ```

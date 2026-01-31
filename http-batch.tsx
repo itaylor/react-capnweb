@@ -164,8 +164,8 @@ export function initCapnHttpBatch<T extends RpcCompatible<T>>(
     referrerPolicy: options.referrerPolicy,
   });
 
-  // Custom useCapnWebStub that creates a new HTTP batch session each time
-  function useCapnWebStub(): RpcStub<T> {
+  // Custom getCapnWebStub that creates a new HTTP batch session each time
+  function getCapnWebStub(): RpcStub<T> {
     const session = newHttpBatchRpcSession<T>(
       request.clone(),
       options.sessionOptions,
@@ -174,11 +174,7 @@ export function initCapnHttpBatch<T extends RpcCompatible<T>>(
   }
 
   // Use the core hooks with our custom stub implementation
-  const hooks = createHooks<T>(useCapnWebStub);
-
-  function CapnWebProvider({ children }: { children: React.ReactNode }) {
-    return <>{children}</>;
-  }
+  const hooks = createHooks<T>(getCapnWebStub);
 
   function close() {
     // No-op for HTTP Batch - no persistent connection to close
@@ -186,7 +182,6 @@ export function initCapnHttpBatch<T extends RpcCompatible<T>>(
 
   return {
     ...hooks,
-    CapnWebProvider,
     close,
   };
 }

@@ -12,14 +12,6 @@ import type { RpcCompatible, RpcStub } from 'capnweb';
  */
 export interface CapnWebHooks<T extends RpcCompatible<T>> {
   /**
-   * Provider component that manages the RPC session lifecycle.
-   * Wrap your application or component tree with this provider.
-   */
-  CapnWebProvider: (props: {
-    children: React.ReactNode;
-  }) => React.ReactNode;
-
-  /**
    * Hook for making simple RPC calls with React Suspense support.
    * Suspends until the promise resolves, making it work seamlessly with Suspense boundaries.
    *
@@ -48,12 +40,12 @@ export interface CapnWebHooks<T extends RpcCompatible<T>> {
   ): R;
 
   /**
-   * Hook for direct access to the RPC API stub.
+   * Get direct access to the RPC API stub.
    * Use this for more control over when and how RPC calls are made.
    *
    * @returns The RPC API stub
    */
-  useCapnWebStub: () => RpcStub<T>;
+  getCapnWebStub: () => RpcStub<T>;
 
   /**
    * Manually close the connection and dispose the session.
@@ -64,16 +56,15 @@ export interface CapnWebHooks<T extends RpcCompatible<T>> {
 }
 
 /**
- * Creates hook functions that work with a provided context.
- * This is used when you need custom provider logic (like reconnection in WebSocket).
+ * Creates hook functions that use a provided session getter.
  *
- * @param apiContext - React context that holds the RPC session/stub
- * @returns Hook functions (useCapnWeb and useCapnWebApi)
+ * @param getCapnWebStub - Function that returns the RPC session/stub
+ * @returns Hook functions (useCapnWeb, useCapnWebQuery, getCapnWebStub)
  */
 
 export function createHooks<T extends RpcCompatible<T>>(
-  useCapnWebStub: () => RpcStub<T>,
-): Omit<CapnWebHooks<T>, 'CapnWebProvider' | 'close'> {
+  getCapnWebStub: () => RpcStub<T>,
+): Omit<CapnWebHooks<T>, 'close'> {
   type PromiseTracker = {
     status: 'pending' | 'resolved' | 'rejected';
     promise: Promise<any>;
@@ -112,7 +103,7 @@ export function createHooks<T extends RpcCompatible<T>>(
   ): R {
     let prom: Promise<any> | undefined;
     try {
-      const api = useCapnWebStub() as any;
+      const api = getCapnWebStub() as any;
       prom = promiseCache.get(currCacheKey)?.promise;
       if (!prom) {
         prom = Promise.resolve(fn(api));
@@ -134,7 +125,10 @@ export function createHooks<T extends RpcCompatible<T>>(
         return () => cleanCache(currCacheKey, true);
       }, [currCacheKey]);
     } catch (error) {
-      const errorKey = JSON.stringify(error);
+      // Use error message as cache key to avoid JSON.stringify issues and share cache across same errors
+      const errorKey = `error:${(error as Error).name || 'Error'}: ${
+        (error as Error).message || String(error)
+      }`;
       const cachedError = promiseCache.get(errorKey);
       if (cachedError) {
         prom = cachedError.promise;
@@ -177,8 +171,8 @@ export function createHooks<T extends RpcCompatible<T>>(
   return {
     useCapnWeb,
     useCapnWebQuery,
-    useCapnWebStub,
-  } as Omit<CapnWebHooks<T>, 'CapnWebProvider' | 'close'>;
+    getCapnWebStub,
+  } as Omit<CapnWebHooks<T>, 'close'>;
 }
 
 /**
@@ -186,17 +180,14 @@ export function createHooks<T extends RpcCompatible<T>>(
  * This handles session creation, persistence across provider mount/unmount,
  * disposal, and a close() function.
  *
- * @param sessionFactory - Function that creates and returns the RPC session/stub
+ * @param getSession - Function that returns the RPC session/stub
  * @param onClose - Optional cleanup function called when close() is invoked (before session disposal)
  * @returns The standard CapnWebHooks interface with close() function
  */
 export function createCapnWebHooksWithLifecycle<T extends RpcCompatible<T>>(
-  sessionFactory: () => any,
+  getSession: () => any,
   onClose?: () => void,
 ): CapnWebHooks<T> {
-  // Connection state lives in closure, persists across provider mount/unmount
-  const listeners = new Set<(session: any) => void>();
-
   function disposeSession(sess: any) {
     if (sess && typeof sess[Symbol.dispose] === 'function') {
       try {
@@ -205,10 +196,6 @@ export function createCapnWebHooksWithLifecycle<T extends RpcCompatible<T>>(
         console.error('Error disposing session:', error);
       }
     }
-  }
-
-  function notifyListeners() {
-    listeners.forEach((listener) => listener(sessionFactory()));
   }
 
   function close() {
@@ -221,23 +208,17 @@ export function createCapnWebHooksWithLifecycle<T extends RpcCompatible<T>>(
       }
     }
 
-    // Dispose the session (but keep the reference so useCapnWebStub doesn't return null)
+    // Dispose the session (but keep the reference so getCapnWebStub doesn't return null)
     // The disposed session will handle errors naturally when methods are called
-    disposeSession(sessionFactory());
-    notifyListeners();
-  }
-
-  function CapnWebProvider({ children }: { children: React.ReactNode }) {
-    return children;
+    disposeSession(getSession());
   }
 
   const hooks = createHooks<T>(
-    sessionFactory,
+    getSession,
   );
 
   return {
     ...hooks,
-    CapnWebProvider,
     close,
   };
 }

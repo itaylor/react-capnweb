@@ -13,8 +13,7 @@ interface TestApi {
 
 // Initialize WebSocket connection
 const {
-  CapnWebProvider,
-  useCapnWebStub,
+  getCapnWebStub,
   useCapnWeb,
   useCapnWebQuery,
   useConnectionState,
@@ -170,7 +169,7 @@ function ApiTests() {
   };
 
   const runTests = async () => {
-    const api = useCapnWebStub();
+    const api = getCapnWebStub();
     setIsRunning(true);
     setTestResults([]);
 
@@ -437,29 +436,27 @@ function CallbackLogger() {
 
 function App() {
   return (
-    <CapnWebProvider>
-      <div data-testid='websocket-demo'>
-        <ConnectionStatus />
-        <ErrorBoundary>
-          <Suspense fallback={<div>Loading...</div>}>
-            <ApiTests />
-          </Suspense>
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <Suspense fallback={<div>Loading...</div>}>
-            <UseCapnWebTests />
-          </Suspense>
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <Suspense fallback={<div>Loading...</div>}>
-            <UseCapnWebQueryTests />
-          </Suspense>
-        </ErrorBoundary>
-        <SuspenseTest />
-        <ManualConnectionControl />
-        <CallbackLogger />
-      </div>
-    </CapnWebProvider>
+    <div data-testid='websocket-demo'>
+      <ConnectionStatus />
+      <ErrorBoundary>
+        <Suspense fallback={<div>Loading...</div>}>
+          <ApiTests />
+        </Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <Suspense fallback={<div>Loading...</div>}>
+          <UseCapnWebTests />
+        </Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <Suspense fallback={<div>Loading...</div>}>
+          <UseCapnWebQueryTests />
+        </Suspense>
+      </ErrorBoundary>
+      <SuspenseTest />
+      <ManualConnectionControl />
+      <CallbackLogger />
+    </div>
   );
 }
 
