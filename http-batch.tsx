@@ -80,7 +80,7 @@ export interface HttpBatchOptions {
  * ```tsx
  * import { initCapnHttpBatch } from '@itaylor/react-capnweb/http-batch';
  *
- * const { CapnWebProvider, useCapnWeb, useCapnWebApi } =
+ * const { useCapnWeb, useCapnWebApi } =
  *   initCapnHttpBatch<MyApi>('/api/rpc', {
  *     headers: { 'Authorization': 'Bearer token123' },
  *     credentials: 'include',
@@ -88,9 +88,7 @@ export interface HttpBatchOptions {
  *
  * function App() {
  *   return (
- *     <CapnWebProvider>
- *       <MyComponent />
- *     </CapnWebProvider>
+ *     <MyComponent />
  *   );
  * }
  *

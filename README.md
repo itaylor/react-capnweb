@@ -234,15 +234,17 @@ const { useCapnWeb, useCapnWebQuery, getCapnWebStub } = initCapnHttpBatch<
 );
 
 function MyComponent() {
-  const executeBatch = useCapnWebBatch();
-
   // ✅ Single batch - all calls in one HTTP request
-  const [user, posts, comments] = useCapnWeb((api) => {
-    const userPromise = api.getUser('123');
-    const postsPromise = api.getUserPosts('123');
-    const commentsPromise = api.getUserComments('123');
-    return Promise.all([userPromise, postsPromise, commentsPromise]);
-  }, ['123']);
+  const [user, posts, comments] = useCapnWebQuery(
+    'userPostsComments',
+    (api) => {
+      const userPromise = api.getUser('123');
+      const postsPromise = api.getUserPosts('123');
+      const commentsPromise = api.getUserComments('123');
+      return Promise.all([userPromise, postsPromise, commentsPromise]);
+    },
+    ['123'],
+  );
 
   // ✅ Or call getCapnWebStub in async handlers (NOT a real React hook!)
   const handleAction = async () => {
@@ -403,8 +405,9 @@ const stats = useCapnWebQuery('dashboardStats', (api) => {
 
 ### `getCapnWebStub()`
 
-Hook for direct access to the RPC API stub. Use this when you need imperative
-control over RPC calls (e.g., in event handlers, effects, or callbacks).
+Gets direct access to the RPC API stub. Use this when you need imperative
+control over RPC calls (e.g., in event handlers, effects, or callbacks). As this
+is not a hook, it does not support suspense.
 
 **Returns:** The RPC API stub
 
@@ -554,12 +557,10 @@ lifecycle behavior because capnweb HTTP Batch sessions are single-use per batch:
 
 - Each call to `useCapnWeb()`, `useCapnWebQuery()`, or `getCapnWebStub()`
   creates a new batch session
-- `getCapnWebStub()` is **not actually a React hook** - it doesn't use context
-  or state, it just creates a fresh session each time. This means you can call
-  it anywhere, including inside async functions and event handlers
 - To batch multiple calls together, get the api once and make all calls before
   awaiting any of them
-- Don't await inside the `useCapnWeb()` callback - the batch ends when you await
+- Don't await inside the `useCapnWebQuery()` callback - the batch ends when you
+  await
 
 **Batching examples:**
 
@@ -629,8 +630,7 @@ interface CustomTransportOptions {
 The WebSocket connection persists across provider mount/unmount cycles. This
 means:
 
-- Connection is created once when the first provider mounts
-- Connection stays open even if the provider unmounts (e.g., during navigation)
+- Connection is created once when initCapnWebSocket is called
 - Connection only closes when it disconnects/errors and exhausts retries, or
   when you call `close()`
 
@@ -645,11 +645,7 @@ function App() {
     return () => close();
   }, []);
 
-  return (
-    <CapnWebProvider>
-      <YourApp />
-    </CapnWebProvider>
-  );
+  return <YourApp />;
 }
 ```
 
@@ -658,7 +654,7 @@ navigation and component remounting.
 
 ### Type Safety
 
-All RPC calls are fully typed based on your Cap'n Proto schema:
+All RPC calls are fully typed based on your Cap'n Web schema:
 
 ```typescript
 interface MyApi extends RpcTarget {
@@ -667,7 +663,7 @@ interface MyApi extends RpcTarget {
 }
 
 // TypeScript knows the return types!
-const user = useCapnWeb((api) => api.getUser('123'), ['123']);
+const user = useCapnWebQuery((api) => api.getUser('123'), ['123']);
 // user is typed as User | undefined
 ```
 
@@ -722,10 +718,9 @@ your component code:
 
 ```typescript
 // Development: Use WebSocket for hot reload friendly connection
-const { CapnWebProvider, useCapnWeb, useCapnWebQuery, getCapnWebStub } =
-  import.meta.env.DEV
-    ? initCapnWebSocket('ws://localhost:8080')
-    : initCapnHttpBatch('/api/rpc');
+const { useCapnWeb, useCapnWebQuery, getCapnWebStub } = import.meta.env.DEV
+  ? initCapnWebSocket('ws://localhost:8080')
+  : initCapnHttpBatch('/api/rpc');
 
 // Note: HTTP Batch has single-use sessions, so you may need to adjust
 // batching strategy, but the API is the same
@@ -743,13 +738,7 @@ const httpApi = initCapnHttpBatch<MainApi>('/api/rpc');
 const wsApi = initCapnWebSocket<RealtimeApi>('ws://localhost:8080/live');
 
 function App() {
-  return (
-    <httpApi.CapnWebProvider>
-      <wsApi.CapnWebProvider>
-        <YourApp />
-      </wsApi.CapnWebProvider>
-    </httpApi.CapnWebProvider>
-  );
+  return <YourApp />;
 }
 
 function YourApp() {

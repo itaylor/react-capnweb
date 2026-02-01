@@ -1,5 +1,5 @@
-// deno-lint-ignore verbatim-module-syntax
-import * as React from 'react';
+// deno-lint-ignore no-unused-vars verbatim-module-syntax
+import React from 'react';
 import { useEffect, useState } from 'react';
 import type { RpcCompatible, RpcSessionOptions, RpcStub } from 'capnweb';
 import { newWebSocketRpcSession } from 'capnweb';
