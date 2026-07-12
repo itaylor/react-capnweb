@@ -1,6 +1,4 @@
-// deno-lint-ignore no-unused-vars verbatim-module-syntax
-import React from 'react';
-import { use, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import type { RpcCompatible, RpcStub } from 'capnweb';
 
 // RpcStub from capnweb supports promise pipelining where RpcPromise values can be passed as parameters
@@ -69,7 +67,28 @@ export function createHooks<T extends RpcCompatible<T>>(
     status: 'pending' | 'resolved' | 'rejected';
     promise: Promise<any>;
     timestamp: number;
+    value?: unknown;
+    error?: unknown;
   };
+
+  /**
+   * Suspense read that works under both renderers. React 19 exposes
+   * `use(promise)`; Preact (aliased in via preact/compat) does not implement
+   * it (preactjs/preact#4756), but its Suspense supports the classic
+   * throw-the-promise protocol — as does React 18's. Feature-detected at call
+   * time so one build of this package serves all of them, which is why the
+   * tracker records `value`/`error`: the throw protocol needs a synchronous
+   * read once the promise settles, where `use` keeps that state internally.
+   */
+  function readPromise<R>(tracker: PromiseTracker): R {
+    const maybeUse = (React as { use?: <T>(p: Promise<T>) => T }).use;
+    if (typeof maybeUse === 'function') {
+      return maybeUse(tracker.promise) as R;
+    }
+    if (tracker.status === 'resolved') return tracker.value as R;
+    if (tracker.status === 'rejected') throw tracker.error;
+    throw tracker.promise;
+  }
 
   const promiseCache = new Map<string, PromiseTracker>();
   const STALE_PROMISE_MS = 60000; // Clean up settled promises after 1 minute
@@ -101,25 +120,29 @@ export function createHooks<T extends RpcCompatible<T>>(
     currCacheKey: string,
     fn: (api: RpcStub<T>) => Promise<R>,
   ): R {
-    let prom: Promise<any> | undefined;
+    let tracker: PromiseTracker;
     try {
       const api = getCapnWebStub() as any;
-      prom = promiseCache.get(currCacheKey)?.promise;
-      if (!prom) {
-        prom = Promise.resolve(fn(api));
+      let cached = promiseCache.get(currCacheKey);
+      if (!cached) {
+        const prom = Promise.resolve(fn(api));
         const promiseStatus: PromiseTracker = {
           status: 'pending',
           promise: prom,
           timestamp: Date.now(),
         };
-        prom.then(() => {
+        prom.then((value) => {
           promiseStatus.status = 'resolved';
+          promiseStatus.value = value;
         });
-        prom.catch(() => {
+        prom.catch((error) => {
           promiseStatus.status = 'rejected';
+          promiseStatus.error = error;
         });
         promiseCache.set(currCacheKey, promiseStatus);
+        cached = promiseStatus;
       }
+      tracker = cached;
       useEffect(() => {
         // cleanCache(currCacheKey);
         return () => cleanCache(currCacheKey, true);
@@ -131,17 +154,22 @@ export function createHooks<T extends RpcCompatible<T>>(
       }`;
       const cachedError = promiseCache.get(errorKey);
       if (cachedError) {
-        prom = cachedError.promise;
+        tracker = cachedError;
       } else {
-        prom = Promise.reject(error);
-        promiseCache.set(errorKey, {
+        const prom = Promise.reject(error);
+        // Mark handled: the throw-protocol read rethrows `error` without ever
+        // attaching a handler to this promise.
+        prom.catch(() => {});
+        tracker = {
           status: 'rejected',
           promise: prom,
           timestamp: Date.now(),
-        });
+          error,
+        };
+        promiseCache.set(errorKey, tracker);
       }
     }
-    return use(prom);
+    return readPromise<R>(tracker);
   }
 
   function useCapnWeb<K extends keyof T>(

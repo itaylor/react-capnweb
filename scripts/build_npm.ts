@@ -74,10 +74,19 @@ await build({
     engines: {
       node: '>=14.0.0',
     },
+    // '>=18.0.0' rather than 19: the suspense read feature-detects React 19's
+    // `use` and falls back to the throw protocol on React 18 — and the same
+    // range is what lets `react@npm:@preact/compat` aliasing satisfy the peer
+    // for Preact consumers (see README's Preact section).
     peerDependencies: {
-      react: '>=19.0.0',
-      'react-dom': '>=19.0.0',
+      react: '>=18.0.0',
+      'react-dom': '>=18.0.0',
       capnweb: '>=0.3.0',
+    },
+    peerDependenciesMeta: {
+      // The library itself never imports react-dom; it's only listed for
+      // convention. Preact consumers alias or omit it.
+      'react-dom': { optional: true },
     },
     devDependencies: {
       '@types/react': '^19.0.0',

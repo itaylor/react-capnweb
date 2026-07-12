@@ -6,6 +6,7 @@ import {
   DEFAULT_PORT,
   HTTP_BATCH_IP,
   MESSAGE_PORT_IP,
+  PREACT_HTTP_BATCH_IP,
   WEBSOCKET_IP,
 } from './test-fixtures/server-config.ts';
 
@@ -660,6 +661,165 @@ Deno.test('HTTP Batch - Error handling works', async () => {
       resultText,
       'Error',
       'Should show error message',
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
+// ============================================================================
+// Preact HTTP Batch Tests
+// ============================================================================
+// Same library modules, compiled against Preact (react → preact/compat via
+// deno.preact.jsonc). preact/compat has no `use()`, so these exercise
+// core.tsx's throw-protocol Suspense fallback end to end.
+
+Deno.test('Preact HTTP Batch - Page loads and shows demo', async () => {
+  const browser = await launch({ headless: true });
+
+  try {
+    const page = await browser.newPage(
+      `http://${PREACT_HTTP_BATCH_IP}:${DEFAULT_PORT}`,
+    );
+    setupErrorReporting(page);
+
+    await waitForElement(page, '[data-testid="http-batch-preact-demo"]');
+    await waitForElement(page, '[data-testid="direct-call-btn"]');
+  } finally {
+    await browser.close();
+  }
+});
+
+Deno.test('Preact HTTP Batch - useCapnWeb suspends and resolves', async () => {
+  const browser = await launch({ headless: true });
+
+  try {
+    const page = await browser.newPage(
+      `http://${PREACT_HTTP_BATCH_IP}:${DEFAULT_PORT}`,
+    );
+    setupErrorReporting(page);
+
+    await waitForElement(page, '[data-testid="http-batch-preact-demo"]');
+
+    // The Suspense boundary must resolve to the useCapnWeb result.
+    await waitForText(
+      page,
+      '[data-testid="usecapnweb-test-results"]',
+      '✓ Success!',
+    );
+    await waitForText(
+      page,
+      '[data-testid="usecapnweb-test-results"]',
+      '10 + 1 = 11',
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
+Deno.test('Preact HTTP Batch - useCapnWeb re-suspends on new args', async () => {
+  const browser = await launch({ headless: true });
+
+  try {
+    const page = await browser.newPage(
+      `http://${PREACT_HTTP_BATCH_IP}:${DEFAULT_PORT}`,
+    );
+    setupErrorReporting(page);
+
+    await waitForElement(page, '[data-testid="http-batch-preact-demo"]');
+    await waitForText(
+      page,
+      '[data-testid="usecapnweb-test-results"]',
+      '✓ Success!',
+    );
+
+    // Changing state changes the cache key → a fresh RPC through Suspense.
+    const incrementBtn = await waitForElement(
+      page,
+      '[data-testid="increment-btn"]',
+    );
+    await incrementBtn.click();
+
+    await waitForText(
+      page,
+      '[data-testid="usecapnweb-test-results"]',
+      '10 + 2 = 12',
+    );
+    await waitForText(
+      page,
+      '[data-testid="usecapnweb-test-results"]',
+      '✓ Success!',
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
+Deno.test('Preact HTTP Batch - useCapnWebQuery batching works', async () => {
+  const browser = await launch({ headless: true });
+
+  try {
+    const page = await browser.newPage(
+      `http://${PREACT_HTTP_BATCH_IP}:${DEFAULT_PORT}`,
+    );
+    setupErrorReporting(page);
+
+    await waitForElement(page, '[data-testid="http-batch-preact-demo"]');
+
+    await waitForText(
+      page,
+      '[data-testid="usecapnwebquery-test-results"]',
+      '✓ Batched calls passed: [30, 20, 300]',
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
+Deno.test('Preact HTTP Batch - Direct API call works', async () => {
+  const browser = await launch({ headless: true });
+
+  try {
+    const page = await browser.newPage(
+      `http://${PREACT_HTTP_BATCH_IP}:${DEFAULT_PORT}`,
+    );
+    setupErrorReporting(page);
+
+    await waitForElement(page, '[data-testid="http-batch-preact-demo"]');
+
+    const directCallBtn = await waitForElement(
+      page,
+      '[data-testid="direct-call-btn"]',
+    );
+    await directCallBtn.click();
+
+    await waitForText(
+      page,
+      '[data-testid="direct-call-result"]',
+      'Success',
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
+Deno.test('Preact HTTP Batch - rejected RPC reaches the error boundary', async () => {
+  const browser = await launch({ headless: true });
+
+  try {
+    const page = await browser.newPage(
+      `http://${PREACT_HTTP_BATCH_IP}:${DEFAULT_PORT}`,
+    );
+    setupErrorReporting(page);
+
+    await waitForElement(page, '[data-testid="http-batch-preact-demo"]');
+
+    // The throw-protocol rejected path must land in the error boundary,
+    // not render "Unexpected success" or crash the page.
+    await waitForText(
+      page,
+      '[data-testid="error-result"]',
+      'Error:',
     );
   } finally {
     await browser.close();

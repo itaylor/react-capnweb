@@ -758,9 +758,67 @@ function YourApp() {
 }
 ```
 
+## Preact support
+
+The hooks work under Preact via the standard `preact/compat` aliasing — no
+separate package. Internally the Suspense integration feature-detects React 19's
+`use(promise)`; when it's absent (Preact has no `use`,
+[preactjs/preact#4756](https://github.com/preactjs/preact/issues/4756)) it falls
+back to the classic throw-the-promise protocol, which `preact/compat`'s
+`Suspense` fully supports. The same fallback makes React 18 work too.
+
+Vite:
+
+```typescript
+// vite.config.ts
+export default {
+  resolve: {
+    alias: {
+      'react': 'preact/compat',
+      'react-dom': 'preact/compat',
+      'react/jsx-runtime': 'preact/jsx-runtime',
+    },
+  },
+};
+```
+
+Or npm package aliasing (no bundler config):
+
+```bash
+npm install react@npm:@preact/compat react-dom@npm:@preact/compat
+```
+
+**One behavioral difference to know about:** when an already-mounted component
+suspends again (its hook args changed, producing a new pending RPC), Preact
+unmounts the suspended subtree while the fallback shows and remounts it on
+resolution — its own `useState`/`useRef` state is lost. React 19's `use`
+preserves that state. The fix is the usual Suspense guidance, and it's good
+practice under React too: keep state that must survive re-suspension _above_ the
+`Suspense` boundary and pass it down as props:
+
+```tsx
+function UserSection() {
+  const [userId, setUserId] = useState('123'); // survives re-suspension
+  return (
+    <>
+      <UserPicker value={userId} onChange={setUserId} />
+      <Suspense fallback={<Spinner />}>
+        <UserProfile userId={userId} /> {/* suspends on each new userId */}
+      </Suspense>
+    </>
+  );
+}
+```
+
+The Preact integration is exercised in CI by its own browser-test fixture
+(`test-fixtures/http-batch-preact-demo.tsx`, bundled against `deno.preact.jsonc`
+where `react` is mapped to `preact/compat`).
+
 ## Requirements
 
-- React 19+ (requires the `use` hook)
+- React 19+, React 18, or Preact 10.11+ (via `preact/compat` aliasing — see
+  [Preact support](#preact-support)). On React 19 the hooks use `use(promise)`;
+  elsewhere they fall back to the throw-based Suspense protocol.
 - capnweb 0.3.0+
 
 ## License

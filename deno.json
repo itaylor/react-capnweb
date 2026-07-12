@@ -1,6 +1,6 @@
 {
   "name": "@itaylor/react-capnweb",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "React hooks and components for capnweb - A JavaScript-native RPC system, supporting multiple transport protocols",
   "exports": {
     ".": "./mod.tsx",
@@ -39,10 +39,14 @@
     "test:browser": "deno run --allow-all scripts/start-server-and-test.ts \"deno task test:serve\" \"deno test --allow-net --allow-read --allow-env --allow-run --allow-write react-capnweb.browser.test.ts\"",
     "lint": "deno lint",
     "fmt": "deno fmt",
-    "check": "deno check && deno task lint && deno task fmt --check",
+    "check": "deno check && deno task check:preact && deno task lint && deno task fmt --check",
+    "check:preact": "deno check -c deno.preact.jsonc test-fixtures/http-batch-preact-demo.tsx",
     "build:npm": "deno run -A scripts/build_npm.ts",
-    "bundle:fixtures": "deno bundle --sourcemap=inline --outdir=test-fixtures/dist test-fixtures/*.ts*"
+    "bundle:fixtures": "deno task bundle:fixtures:react && deno task bundle:fixtures:preact",
+    "bundle:fixtures:react": "deno bundle --sourcemap=inline --outdir=test-fixtures/dist test-fixtures/websocket-demo.tsx test-fixtures/http-batch-demo.tsx test-fixtures/message-port-demo.tsx test-fixtures/message-port-worker.ts",
+    "bundle:fixtures:preact": "deno bundle -c deno.preact.jsonc --sourcemap=inline --outdir=test-fixtures/dist test-fixtures/http-batch-preact-demo.tsx"
   },
+  "exclude": ["npm", "test-fixtures/http-batch-preact-demo.tsx"],
   "lint": {
     "rules": {
       "exclude": ["no-explicit-any", "no-window"]

@@ -1,0 +1,19 @@
+// Bundle/check config for the Preact test fixture ONLY (see deno.json tasks
+// `bundle:fixtures:preact` / `check:preact`). The whole point of this file is
+// the `react` → `preact/compat` mapping: it makes core.tsx/http-batch.tsx
+// resolve their 'react' imports to Preact, exactly the way a consuming app
+// aliases them in Vite/npm — which is what the Preact browser tests exist to
+// prove works (core.tsx's readPromise falls back to the throw-a-promise
+// Suspense protocol because preact/compat has no `use()`).
+{
+  "imports": {
+    "capnweb": "npm:capnweb@0.4.0",
+    "react": "npm:preact@^10.28.1/compat",
+    "preact": "npm:preact@^10.28.1"
+  },
+  "compilerOptions": {
+    "lib": ["dom", "esnext", "dom.iterable", "esnext.disposable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
+  }
+}
